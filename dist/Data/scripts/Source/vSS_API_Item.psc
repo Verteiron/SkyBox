@@ -176,7 +176,7 @@ String Function SerializeEquipment(ObjectReference akObject) Global
 	Int jItemInfo = JMap.Object()
 
 	JMap.SetForm(jItemInfo,"Form",kItem)
-
+	JMap.SetStr(jItemInfo,"RefCount",akObject.GetNumReferenceAliases())
 	Bool isWeapon = False
 	Bool isEnchantable = False
 	Bool isTwoHanded = False
@@ -205,8 +205,7 @@ String Function SerializeEquipment(ObjectReference akObject) Global
 	If kItemEnchantment
 		;PlayerEnchantments[newindex] = kItemEnchantment
 		;Debug.Trace("vSS/CM: " + kItem.GetName() + " has enchantment " + kItemEnchantment.GetFormID() + ", " + kItemEnchantment.GetName())
-		JMap.SetForm(jItemEnchantmentInfo,"Form",kItemEnchantment.GetBaseEnchantment())
-		JMap.SetStr(jItemInfo,"Source",SuperStash.GetSourceMod(kItemEnchantment))
+		JMap.SetForm(jItemEnchantmentInfo,"Form",kItemEnchantment)
 ;		AddToReqList(kItemEnchantment,"Enchantment")
 		JMap.SetStr(jItemEnchantmentInfo,"Source",SuperStash.GetSourceMod(kItemEnchantment))
 		JMap.SetInt(jItemEnchantmentInfo,"IsCustom",0)
@@ -223,7 +222,7 @@ String Function SerializeEquipment(ObjectReference akObject) Global
 		JMap.SetStr(jItemInfo,"DisplayName",sItemDisplayName)
 		kItemEnchantment = akObject.GetEnchantment()
 		If kItemEnchantment
-			JMap.SetForm(jItemEnchantmentInfo,"Form",kItemEnchantment.GetBaseEnchantment())
+			JMap.SetForm(jItemEnchantmentInfo,"Form",kItemEnchantment)
 			JMap.SetStr(jItemEnchantmentInfo,"Source",SuperStash.GetSourceMod(kItemEnchantment))
 ;			AddToReqList(kItemEnchantment,"Enchantment")
 			JMap.SetInt(jItemEnchantmentInfo,"IsCustom",1)
@@ -301,8 +300,11 @@ ObjectReference Function CreateObjectFromJObj(Int ajObjectInfo) Global
 		Return None
 	EndIf
 
-	ObjectReference kNowhere = Game.GetFormFromFile(0x00FF0004,"vSS_FamiliarFaces.esp") As ObjectReference ; Marker in vSS_StagingCell
-	ObjectReference kObject = kNowhere.PlaceAtMe(kItem)
+	vSS_StashManager StashManager = Quest.GetQuest("vSS_StashManagerQuest") as vSS_StashManager
+
+	ObjectReference kMoveTarget = StashManager.MoveTarget
+
+	ObjectReference kObject = kMoveTarget.PlaceAtMe(kItem)
 	If !kObject
 		DebugTraceAPIItem("CreateObjectFromJObj: " + sItemID + " could not use base Form " + kItem + " to create an ObjectReference!",1)
 		Return None
@@ -431,7 +433,10 @@ ObjectReference Function CreatePotion(String asItemID) Global
 	Potion kDefaultPotion = Game.GetformFromFile(0x0005661f,"Skyrim.esm") as Potion
 	Potion kDefaultPoison = Game.GetformFromFile(0x0005629e,"Skyrim.esm") as Potion
 	
-	ObjectReference kNowhere = Game.GetFormFromFile(0x00FF0004,"vSS_FamiliarFaces.esp") As ObjectReference ; Marker in vSS_StagingCell
+	vSS_StashManager StashManager = Quest.GetQuest("vSS_StashManagerQuest") as vSS_StashManager
+
+	ObjectReference kMoveTarget = StashManager.MoveTarget
+
 	Potion kPotion 
 	If JMap.GetInt(jPotionInfo,"IsPoison")
 		kPotion = kDefaultPoison
@@ -451,7 +456,7 @@ ObjectReference Function CreatePotion(String asItemID) Global
 		kPotion.SetNthEffectArea(i,JMap.GetInt(jEffectsInfo,"Area"))
 	EndWhile
 	
-	Return kNowhere.PlaceAtMe(kPotion,abForcePersist = True)
+	Return kMoveTarget.PlaceAtMe(kPotion,abForcePersist = True)
 EndFunction
 
 Function DebugTraceAPIItem(String sDebugString, Int iSeverity = 0) Global

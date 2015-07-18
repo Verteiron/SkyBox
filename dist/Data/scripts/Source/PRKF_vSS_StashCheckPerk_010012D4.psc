@@ -13,7 +13,7 @@ Utility.Wait(1)
 While UI.IsMenuOpen("ContainerMenu")
 Utility.Wait(0.2)
 EndWhile
-Int iCount = vSS_API_Stash.UpdateStashItems(akTargetRef)
+Int iCount = vSS_API_Stash.ExportStashItems(akTargetRef)
 ;END CODE
 EndFunction
 ;END FRAGMENT

@@ -166,7 +166,72 @@ String[] Function GetStashItems(ObjectReference akStashRef) Global
 	Return sRet
 EndFunction
 
-Int Function UpdateStashItems(ObjectReference akStashRef) Global
+Int Function LoadStashesForCell(Cell akCell) Global
+	Int iContainerCount = akCell.GetNumRefs(formTypeFilter = 28) ;kContainer
+	Int i = 0
+	While i < iContainerCount
+		ObjectReference kContainer = akCell.GetNthRef(i,28)
+		If IsStash(kContainer)
+			Int iCount = ImportStashItems(kContainer)
+			DebugTraceAPIStash("Imported " + iCount + " items for " + kContainer + ".")
+		EndIf
+		i += 1
+	EndWhile
+	Return i
+EndFunction
+
+Int Function ImportStashItems(ObjectReference akStashRef) Global
+	If !IsStash(akStashRef)
+		DebugTraceAPIStash("Error! " + akStashRef + " is not a valid Stash!")
+		Return 0
+	EndIf
+
+	akStashRef.BlockActivation(True)
+
+	vSS_StashManager StashManager = Quest.GetQuest("vSS_StashManagerQuest") as vSS_StashManager
+
+	ObjectReference kMoveTarget 		= StashManager.MoveTarget
+	ObjectReference kContainerTarget 	= StashManager.ContainerTarget
+
+	Int iOriginalItemCount = akStashRef.GetContainerForms().Length
+
+	Int jItemList = GetStashObj(akStashRef,"Items")
+	If !jItemList
+		DebugTraceAPIStash("Error! " + akStashRef + " is missing its ItemList!")
+		Return 0
+	EndIf
+
+	Int i = JArray.Count(jItemList)
+	While i > 0
+		i -= 1
+		Int jItemMap = JArray.GetObj(jItemList,i)
+		String sItemID = JMap.GetStr(jItemMap,"UUID")
+		If sItemID
+			ObjectReference kObject = vSS_API_Item.CreateObject(sItemID)
+			If kObject
+				akStashRef.AddItem(kObject, 1, True)
+			Else
+				DebugTraceAPIStash("Error! " + akStashRef + " could not recreate item " + JMap.GetStr(jItemMap,"DisplayName") + " (" + sItemID + ")!")
+			EndIf
+		Else
+			Form kItem = JMap.GetForm(jItemMap,"Form")
+			If kItem 
+				akStashRef.AddItem(kItem, JMap.GetInt(jItemMap,"Count"), abSilent = True)
+			Else
+				DebugTraceAPIStash("Error! " + akStashRef + " could not load a form!")
+			EndIf
+		EndIf
+	EndWhile
+	If iOriginalItemCount > 0 ;&& iOriginalItemCount != akStashRef.GetContainerForms().Length
+		ExportStashItems(akStashRef)
+	EndIf
+	akStashRef.BlockActivation(False)
+
+	Return 0
+
+EndFunction
+
+Int Function ExportStashItems(ObjectReference akStashRef) Global
 	If !IsStash(akStashRef)
 		DebugTraceAPIStash("Error! " + akStashRef + " is not a valid Stash!")
 		Return -1
@@ -212,7 +277,7 @@ Int Function UpdateStashItems(ObjectReference akStashRef) Global
 					EndIf
 				EndIf
 				If sItemID
-					JArray.AddObj(jItemList,vFF_API_Item.GetItemJMap(sItemID))
+					JArray.AddObj(jItemList,vSS_API_Item.GetItemJMap(sItemID))
 				Else
 					Int jItemMap = JMap.Object()
 					JMap.SetForm(jItemMap,"Form",kItem)
