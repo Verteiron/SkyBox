@@ -256,6 +256,11 @@ Int Function ExportStashItems(ObjectReference akStashRef) Global
 	EndIf
 	SetStashInt(akStashRef,"Busy",1)
 
+	Actor PlayerREF = Game.GetPlayer()
+	String sSessionID = GetSessionStr("SessionID")
+	String sPlayerName = PlayerREF.GetActorBase().GetName()
+	Float fSessionTime = Game.GetRealHoursPassed()
+
 	vSS_StashManager StashManager = Quest.GetQuest("vSS_StashManagerQuest") as vSS_StashManager
 
 	ObjectReference kMoveTarget 		= StashManager.MoveTarget
@@ -296,19 +301,25 @@ Int Function ExportStashItems(ObjectReference akStashRef) Global
 						akStashRef.AddItem(kObject,abSilent = True)
 					EndIf
 				EndIf
+				Int jItemMap
 				If sItemID
-					JArray.AddObj(jItemList,vSS_API_Item.GetItemJMap(sItemID))
+					jItemMap = vSS_API_Item.GetItemJMap(sItemID)
 				Else
-					Int jItemMap = JMap.Object()
+					jItemMap = JMap.Object()
 					JMap.SetForm(jItemMap,"Form",kItem)
 					JMap.SetInt(jItemMap,"Count",iCount)
-					JArray.AddObj(jItemList,jItemMap)
 				EndIf
+				JMap.SetStr(jItemMap,"SessionID",sSessionID)
+				JMap.SetStr(jItemMap,"PlayerName",sPlayerName)
+				JMap.SetFlt(jItemMap,"SessionTime",fSessionTime)
+				JArray.AddObj(jItemList,jItemMap)
 			EndIf
 		EndIf
 	EndWhile
 	DebugTraceAPIStash("Updated Stash " + akStashRef + ", found " + (kStashItems.Length - 1) + " items!")
 	SetStashObj(akStashRef,"Items",jItemList)
+	SetStashStr(akStashRef,"LastSessionID",sSessionID)
+	SetStashFlt(akStashRef,"LastSessionTime",fSessionTime)
 
 	kContainerShader.Stop(akStashRef)
 	akStashRef.BlockActivation(False)
