@@ -186,12 +186,18 @@ Int Function ImportStashItems(ObjectReference akStashRef) Global
 		Return 0
 	EndIf
 
-	akStashRef.BlockActivation(True)
+	If GetStashInt(akStashRef,"Busy")
+		DebugTraceAPIStash("Error! " + akStashRef + " is busy!")
+		Return 0
+	EndIf
+	SetStashInt(akStashRef,"Busy",1)
 
 	vSS_StashManager StashManager = Quest.GetQuest("vSS_StashManagerQuest") as vSS_StashManager
 
 	ObjectReference kMoveTarget 		= StashManager.MoveTarget
 	ObjectReference kContainerTarget 	= StashManager.ContainerTarget
+
+	EffectShader    kContainerShader 	= StashManager.ContainerFXShader
 
 	Int iOriginalItemCount = akStashRef.GetContainerForms().Length
 
@@ -200,6 +206,9 @@ Int Function ImportStashItems(ObjectReference akStashRef) Global
 		DebugTraceAPIStash("Error! " + akStashRef + " is missing its ItemList!")
 		Return 0
 	EndIf
+
+	akStashRef.BlockActivation(True)
+	kContainerShader.Play(akStashRef)
 
 	Int i = JArray.Count(jItemList)
 	While i > 0
@@ -225,6 +234,8 @@ Int Function ImportStashItems(ObjectReference akStashRef) Global
 	If iOriginalItemCount > 0 ;&& iOriginalItemCount != akStashRef.GetContainerForms().Length
 		ExportStashItems(akStashRef)
 	EndIf
+	kContainerShader.Stop(akStashRef)
+	SetStashInt(akStashRef,"Busy",0)
 	akStashRef.BlockActivation(False)
 
 	Return 0
@@ -239,10 +250,19 @@ Int Function ExportStashItems(ObjectReference akStashRef) Global
 
 	akStashRef.BlockActivation(True)
 	
+	If GetStashInt(akStashRef,"Busy")
+		DebugTraceAPIStash("Error! " + akStashRef + " is busy!")
+		Return 0
+	EndIf
+	SetStashInt(akStashRef,"Busy",1)
+
 	vSS_StashManager StashManager = Quest.GetQuest("vSS_StashManagerQuest") as vSS_StashManager
 
 	ObjectReference kMoveTarget 		= StashManager.MoveTarget
 	ObjectReference kContainerTarget 	= StashManager.ContainerTarget
+	EffectShader    kContainerShader 	= StashManager.ContainerFXShader
+
+	kContainerShader.Play(akStashRef)
 
 	String sStashID = GetFormIDString(akStashRef)
 
@@ -289,7 +309,10 @@ Int Function ExportStashItems(ObjectReference akStashRef) Global
 	EndWhile
 	DebugTraceAPIStash("Updated Stash " + akStashRef + ", found " + (kStashItems.Length - 1) + " items!")
 	SetStashObj(akStashRef,"Items",jItemList)
+
+	kContainerShader.Stop(akStashRef)
 	akStashRef.BlockActivation(False)
+	SetStashInt(akStashRef,"Busy",0)
 
 	JValue.releaseObjectsWithTag("vSS_" + sStashID)
 

@@ -54,6 +54,8 @@ Perk 				Property vSS_StashCheckPerk 					Auto
 ObjectReference 	Property ContainerTarget 						Auto
 ObjectReference 	Property MoveTarget		 						Auto
 
+EffectShader   		Property ContainerFXShader 						Auto
+
 ;=== Variables ===--
 
 Int		_iThreadCount	= 0
