@@ -49,6 +49,9 @@ Int 				Property SerializationVersion = 5 				Auto Hidden
 Actor 				Property PlayerRef 								Auto
 {The Player, duh.}
 
+ObjectReference 	Property ContainerTarget 						Auto
+ObjectReference 	Property MoveTarget		 						Auto
+
 ;=== Variables ===--
 
 Int		_iThreadCount	= 0
@@ -162,9 +165,9 @@ If sSID is blank, then add to the current Session instead.}
 			sFormName = akForm as String
 		EndIf
 		If sSID == SessionID 
-			SetSessionStr("Characters." + sSID + META + ".ReqList." + sModName + "." + asType + ".0x" + GetFormIDString(akForm),sFormName)
+			SetSessionStr("Characters." + sSID + META + ".ReqList." + sModName + "." + asType + ".0x" + SuperStash.GetFormIDString(akForm),sFormName)
 		Else
-			SetRegStr("Characters." + sSID + META + ".ReqList." + sModName + "." + asType + ".0x" + GetFormIDString(akForm),sFormName)
+			SetRegStr("Characters." + sSID + META + ".ReqList." + sModName + "." + asType + ".0x" + SuperStash.GetFormIDString(akForm),sFormName)
 		EndIf
 	EndIf
 EndFunction
@@ -197,83 +200,6 @@ EndFunction
 Function DebugTrace(String sDebugString, Int iSeverity = 0)
 	Debug.Trace("vSS/StashManager: " + sDebugString,iSeverity)
 EndFunction
-
-String Function GetFormIDString(Form kForm)
-	String sResult
-	sResult = kForm as String ; [FormName < (FF000000)>]
-	sResult = StringUtil.SubString(sResult,StringUtil.Find(sResult,"(") + 1,8)
-	Return sResult
-EndFunction
-
-Function StartTimer(String sTimerLabel)
-	Float fTime = GetCurrentRealTime()
-	;Debug.Trace("TimerStart(" + sTimerLabel + ") " + fTime)
-	;DebugTrace("Timer: Starting for " + sTimerLabel)
-	SetSessionFlt("Timers." + sTimerLabel,fTime)
-EndFunction
-
-Function StopTimer(String sTimerLabel)
-	Float fTime = GetCurrentRealTime()
-	;Debug.Trace("TimerStop (" + sTimerLabel + ") " + fTime)
-	DebugTrace("Timer: " + (fTime - GetSessionFlt("Timers." + sTimerLabel)) + " for " + sTimerLabel)
-	ClearSessionKey("Timers." + sTimerLabel)
-EndFunction
-
-String Function StringReplace(String sString, String sToFind, String sReplacement)
-	If sToFind == sReplacement 
-		Return sString
-	EndIf
-	While StringUtil.Find(sString,sToFind) > -1
-		sString = StringUtil.SubString(sString,0,StringUtil.Find(sString,sToFind)) + sReplacement + StringUtil.SubString(sString,StringUtil.Find(sString,sToFind) + 1)
-	EndWhile
-	Return sString
-EndFunction
-
-String[] Function JObjToArrayStr(Int ajObj)
-
-	String[] sReturn
-	Int jStrArray
-	If JValue.IsMap(ajObj)
-		jStrArray = JArray.Sort(JMap.AllKeys(ajObj))
-	ElseIf jValue.IsArray(ajObj)
-		jStrArray = ajObj
-	EndIf
-	If jStrArray
-		Int i = JArray.Count(jStrArray)
-		DebugTrace("JObjToArrayStr: Converting " + i + " jValues to an array of strings...")
-		sReturn = Utility.CreateStringArray(i, "")
-		While i > 0
-			i -= 1
-			sReturn[i] = JArray.GetStr(jStrArray,i)
-			DebugTrace("JObjToArrayStr:  Added " + sReturn[i] + " at index " + i + "!")
-		EndWhile
-	EndIf
-	DebugTrace("JObjToArrayStr: Done!")
-	Return sReturn
-EndFunction
-
-Form[] Function JObjToArrayForm(Int ajObj)
-	Form[] kReturn
-	Int jFormArray
-	If JValue.IsMap(ajObj)
-		jFormArray = JArray.Sort(JMap.AllKeys(ajObj))
-	ElseIf jValue.IsArray(ajObj)
-		jFormArray = ajObj
-	EndIf
-	If jFormArray
-		Int i = JArray.Count(jFormArray)
-		DebugTrace("JObjToArrayForm: Converting " + i + " jValues to an array of forms...")
-		kReturn = Utility.CreateFormArray(i, None)
-		While i > 0
-			i -= 1
-			kReturn[i] = JArray.GetForm(jFormArray,i)
-			DebugTrace("JObjToArrayForm:  Added " + kReturn[i] + " at index " + i + "!")
-		EndWhile
-	EndIf
-	DebugTrace("JObjToArrayForm: Done!")
-	Return kReturn
-EndFunction
-
 
 ;=== Functions - Busy state ===--
 

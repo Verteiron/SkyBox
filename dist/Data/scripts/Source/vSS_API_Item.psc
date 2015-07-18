@@ -153,6 +153,8 @@ String Function SerializeObject(ObjectReference akObject) Global
 		Return SerializeEquipment(akObject)
 	ElseIf kItem as Potion
 		Return SerializePotion(akObject)
+	Else
+		DebugTraceAPIItem("Item is not equipment or potion!")
 	EndIf
 	Return ""
 EndFunction
@@ -264,126 +266,6 @@ String Function SerializeEquipment(ObjectReference akObject) Global
 	;Debug.Trace("vSS/CM: Finished serializing " + kItem.GetName() + ", JMap count is " + JMap.Count(jItemInfo))
 
 	Return vSS_API_Item.SaveItem(jItemInfo)
-EndFunction
-
-;Serialize an item without unequipping it from an actor
-String Function SerializeEquippedObject(Form kItem, Int iHand = 1, Int h = 0, Actor kWornObjectActor = None) Global
-{Fills the JMap jEquipmentInfo with all info from Form kItem.}
-	
-	Int jEquipmentInfo = JMap.Object()
-
-	JMap.SetForm(jEquipmentInfo,"Form",kItem)
-
-	If !kWornObjectActor
-		kWornObjectActor = Game.GetPlayer()
-	EndIf
-
-	Bool isWeapon = False
-	Bool isEnchantable = False
-	Bool isTwoHanded = False
-	Enchantment kItemEnchantment
-	If kItem
-		;Debug.Trace("vSS/CM: " + kItem.GetName() + " is Mod ID " + (kItem.GetFormID() / 0x1000000))
-		;JMap.SetStr(jEquipmentInfo,"Source",GetModName(kItem.GetFormID() / 0x1000000))
-		JMap.SetStr(jEquipmentInfo,"Source",FFUtils.GetSourceMod(kItem))
-	EndIf
-	;Debug.Trace("vSS/CM: Serializing " + kItem.GetName() + "...")
-	If (kItem as Weapon)
-		isWeapon = True
-		isEnchantable = True
-		Int iWeaponType = (kItem as Weapon).GetWeaponType()
-		If iWeaponType > 4 && iWeaponType != 8
-			IsTwoHanded = True
-		EndIf
-		kItemEnchantment = (kItem as Weapon).GetEnchantment()
-	ElseIf (kItem as Armor)
-		isEnchantable = True
-		kItemEnchantment = (kItem as Armor).GetEnchantment()
-	Else
-		;If the Item isn't a Weapon or Armor, it's a Spell, Light (torch), or None. It doesn't need to be serialized.
-		Return ""
-	EndIf
-
-	Int jEquipmentEnchantmentInfo = JMap.Object()
-	If isEnchantable ; don't create enchantment block unless object can be enchanted
-		JMap.SetObj(jEquipmentInfo,"Enchantment",jEquipmentEnchantmentInfo)
-	EndIf
-
-	If kItemEnchantment
-		;PlayerEnchantments[newindex] = kItemEnchantment
-		;Debug.Trace("vSS/CM: " + kItem.GetName() + " has enchantment " + kItemEnchantment.GetFormID() + ", " + kItemEnchantment.GetName())
-		JMap.SetForm(jEquipmentEnchantmentInfo,"Form",kItemEnchantment)
-		JMap.SetStr(jEquipmentInfo,"Source",FFUtils.GetSourceMod(kItemEnchantment))
-;		AddToReqList(kItemEnchantment,"Enchantment")
-		JMap.SetStr(jEquipmentEnchantmentInfo,"Source",FFUtils.GetSourceMod(kItemEnchantment))
-		JMap.SetInt(jEquipmentEnchantmentInfo,"IsCustom",0)
-	EndIf
-	String sItemDisplayName = WornObject.GetDisplayName(kWornObjectActor,iHand,h)
-	sItemDisplayName = StringUtil.SubString(sItemDisplayName,0,StringUtil.Find(sItemDisplayName,"(") - 1) ; Strip " (Legendary)"
-	kItemEnchantment = WornObject.GetEnchantment(kWornObjectActor,iHand,h)
-	If sItemDisplayName || kItemEnchantment
-		;Debug.Trace("vSS/CM: " + kItem + " is enchanted/forged item " + sItemDisplayName)
-		JMap.SetInt(jEquipmentInfo,"IsCustom",1)
-		JMap.SetFlt(jEquipmentInfo,"ItemHealthPercent",WornObject.GetItemHealthPercent(kWornObjectActor,iHand,h))
-		JMap.SetFlt(jEquipmentInfo,"ItemCharge",WornObject.GetItemCharge(kWornObjectActor,iHand,h))
-		JMap.SetFlt(jEquipmentInfo,"ItemMaxCharge",WornObject.GetItemMaxCharge(kWornObjectActor,iHand,h))
-		JMap.SetStr(jEquipmentInfo,"DisplayName",sItemDisplayName)
-		kItemEnchantment = WornObject.GetEnchantment(kWornObjectActor,iHand,h)
-		If kItemEnchantment
-			JMap.SetForm(jEquipmentEnchantmentInfo,"Form",kItemEnchantment)
-			JMap.SetStr(jEquipmentEnchantmentInfo,"Source",FFUtils.GetSourceMod(kItemEnchantment))
-;			AddToReqList(kItemEnchantment,"Enchantment")
-			JMap.SetInt(jEquipmentEnchantmentInfo,"IsCustom",1)
-			Int iNumEffects = kItemEnchantment.GetNumEffects()
-			JMap.SetInt(jEquipmentEnchantmentInfo,"NumEffects",iNumEffects)
-			Int jEffectsArray = JArray.Object()
-			Int j = 0
-			While j < iNumEffects
-				Int jEffectsInfo = JMap.Object()
-				JMap.SetFlt(jEffectsInfo, "Magnitude", kItemEnchantment.GetNthEffectMagnitude(j))
-				JMap.SetFlt(jEffectsInfo, "Area", kItemEnchantment.GetNthEffectArea(j))
-				JMap.SetFlt(jEffectsInfo, "Duration", kItemEnchantment.GetNthEffectDuration(j))
-				JMap.SetForm(jEffectsInfo,"MagicEffect", kItemEnchantment.GetNthEffectMagicEffect(j))
-				JMap.SetStr(jEffectsInfo,"Source",FFUtils.GetSourceMod(kItemEnchantment.GetNthEffectMagicEffect(j)))
-;				AddToReqList(kItemEnchantment.GetNthEffectMagicEffect(j),"MagicEffect")
-				JArray.AddObj(jEffectsArray,jEffectsInfo)
-				j += 1
-			EndWhile
-			JMap.SetObj(jEquipmentEnchantmentInfo,"Effects",jEffectsArray)
-		EndIf
-	Else
-		JMap.SetInt(jEquipmentInfo,"IsCustom",0)
-	EndIf
-	
-	;Save dye color, if applicable
-	If GetRegBool("Config.NIO.ArmorDye.Enabled") && kItem as Armor 
-		Bool bHasDye = False
-		Int iHandle = NiOverride.GetItemUniqueID(kWornObjectActor, 0, (kItem as Armor).GetSlotMask(), False)
-		Int[] iNIODyeColors = New Int[15]
-		Int iMaskIndex = 0
-		While iMaskIndex < iNIODyeColors.Length
-			Int iColor = NiOverride.GetItemDyeColor(iHandle, iMaskIndex)
-			If Math.RightShift(iColor,24) > 0
-				bHasDye = True
-				iNIODyeColors[iMaskIndex] = iColor
-			EndIf
-			iMaskIndex += 1
-		EndWhile
-		If bHasDye
-			JMap.SetObj(jEquipmentInfo,"NIODyeColors",JArray.objectWithInts(iNIODyeColors))
-		EndIf
-	EndIf
-
-;	If !(iHand == 0 && IsTwoHanded) && kItem ; exclude left-hand iteration of two-handed weapons
-;		If kWornObjectActor == PlayerREF
-;			kItem.SendModEvent("vSS_EquipmentSaved","",iHand)
-;		Else ;Was not saved from player, indicate this with iHand = -1
-;			kItem.SendModEvent("vSS_EquipmentSaved","",-1)
-;		EndIf
-;	EndIf
-	;Debug.Trace("vSS/CM: Finished serializing " + kItem.GetName() + ", JMap count is " + JMap.Count(jEquipmentInfo))
-
-	Return vSS_API_Item.SaveItem(jEquipmentInfo)
 EndFunction
 
 ObjectReference Function CreateObject(String asItemID) Global

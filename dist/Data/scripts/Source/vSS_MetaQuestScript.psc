@@ -244,7 +244,7 @@ Bool Function CheckDependencies()
 	Float fSKSE = SKSE.GetVersion() + SKSE.GetVersionMinor() * 0.01 + SKSE.GetVersionBeta() * 0.0001
 	DebugTrace("SKSE is version " + fSKSE)
 	DebugTrace("JContainers is version " + SKSE.GetPluginVersion("Jcontainers") + ", API is " + JContainers.APIVersion())
-	DebugTrace("FFutils is version " + SKSE.GetPluginVersion("ffutils"))
+	DebugTrace("SuperStash is version " + SKSE.GetPluginVersion("SuperStash"))
 	DebugTrace("CharGen is version " + SKSE.GetPluginVersion("chargen"))
 	DebugTrace("NIOverride is version " + SKSE.GetPluginVersion("nioverride"))
 	;Debug.MessageBox("SKSE version is " + fSKSE)

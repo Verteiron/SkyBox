@@ -42,7 +42,7 @@ EndFunction
 Function SaveSession() Global
 	;Debug.Trace("vSS/Reg: SaveReg called!")
 	Int jRegData = JDB.solveObj(".vSS.Session")
-	JValue.WriteToFile(jRegData,FFUtils.userDirectory() + "Config/vSS_Session.json")
+	JValue.WriteToFile(jRegData,SuperStash.userDirectory() + "Config/vSS_Session.json")
 EndFunction
 
 Bool Function HasSessionKey(String asPath) Global
