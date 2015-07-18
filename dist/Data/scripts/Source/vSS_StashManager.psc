@@ -100,9 +100,20 @@ Function DoUpkeep(Bool bInBackground = True)
 		SetConfigDefaults()
 	EndIf
 
+	If !GetSessionInt("SessionFingerPrint")
+		Int iSessionFingerprint = Game.QueryStat("Animals Killed") + Game.QueryStat("Gold Found") + Game.QueryStat("Ingredients Harvested") + Game.QueryStat("Diseases Contracted")
+		SetSessionInt("SessionFingerPrint",iSessionFingerprint)
+		SetSessionFlt("SessionStartTime",GetRealHoursPassed())
+	EndIf
+
 	String sMatchedSID = MatchSession()
 	If sMatchedSID
 		SetSessionID(sMatchedSID)
+	Else
+		String sCharacterName = PlayerREF.GetActorBase().GetName()
+		String sSessionID = GetSessionStr("SessionID")
+		SetRegFlt("Sessions." + sCharacterName + "." + sSessionID + ".SessionStartTime",GetSessionFlt("SessionStartTime"))
+		SetRegInt("Sessions." + sCharacterName + "." + sSessionID + ".SessionFingerPrint",GetSessionInt("SessionFingerPrint"))
 	EndIf
 
 	If !PlayerREF.HasPerk(vSS_StashCheckPerk)
@@ -183,13 +194,14 @@ EndFunction
 
 String Function MatchSession(String sCharacterName = "", Float fPlayTime = 0.0)
 {Return the UUID of a session that matches the passed name and playtime. Use the current player's data if none supplied.}
-	If !sCharacterName
+;FIXME: Probably won't use this
+	If !sCharacterName 
 		sCharacterName = PlayerREF.GetActorBase().GetName()
 	EndIf
 	If !fPlayTime
 		fPlayTime = GetRealHoursPassed()
 	EndIf
-	Int jSIDList = JMap.AllKeys(GetRegObj("Names." + sCharacterName))
+	Int jSIDList = JMap.AllKeys(GetRegObj("Sessions." + sCharacterName))
 	DebugTrace("Looking for matching session in " + JArray.Count(jSIDList) + " saved sessions!")
 	If jSIDList
 		Int iSID = JArray.Count(jSIDList)
@@ -197,12 +209,15 @@ String Function MatchSession(String sCharacterName = "", Float fPlayTime = 0.0)
 			iSID -= 1
 			String sSID = JArray.GetStr(jSIDList,iSID)
 			DebugTrace("Checking current session against " + sSID + "...")
-			If Math.ABS(GetRegFlt("Characters." + sSID + META + ".PlayTime") - fPlayTime) < 0.1
-				DebugTrace("Current session matches " + sSID + "!")
-				Return sSID
+			If Math.ABS(GetRegFlt("Sessions." + sCharacterName + "." + sSID + ".SessionStartTime") - GetSessionFlt("SessionStartTime")) < 0.1
+				If GetRegInt("Sessions." + sCharacterName + "." + sSID + ".SessionFingerPrint") >= GetSessionFlt("SessionFingerPrint")
+					DebugTrace("Current session matches " + sSID + "!")
+					Return sSID
+				EndIf
 			EndIf
 		EndWhile
 	EndIf
+
 	Return ""
 EndFunction
 
