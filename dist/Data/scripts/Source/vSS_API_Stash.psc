@@ -23,7 +23,6 @@ Int Function GetStashFormMap() Global
 EndFunction
 
 Int Function GetStashJMap(ObjectReference akStashRef, Bool abCreateIfMissing = False) Global
-	Int iRet = -2 ; akStashRef is not a Stash
 	Int jStashFormMap = GetStashFormMap()
 	Int jStashJMap = JFormMap.GetObj(jStashFormMap,akStashRef)
 	If JValue.isMap(jStashJMap)
@@ -35,88 +34,83 @@ Int Function GetStashJMap(ObjectReference akStashRef, Bool abCreateIfMissing = F
 		SaveReg()
 		Return jStashJMap
 	EndIf
-	Return iRet
+	Return 0
 EndFunction
 
 ;=== Generic Get/Set Functions ===--
 
 Int Function GetStashInt(ObjectReference akStashRef, String asKey) Global
 	asKey = MakePath(asKey)
-	Int iRet = -2 ; akStashRef is not a Stash
 	Int jStashJMap = GetStashJMap(akStashRef)
 	If jStashJMap
 		Return JValue.solveInt(jStashJMap,asKey)
 	EndIf
-	Return iRet
+	Return 0
 EndFunction
 
 Function SetStashInt(ObjectReference akStashRef, String asKey, Int aiValue) Global
 	asKey = MakePath(asKey)
-	JValue.solveIntSetter(GetStashJMap(akStashRef,True),asKey,aiValue)
+	JValue.solveIntSetter(GetStashJMap(akStashRef,True),asKey,aiValue,True)
 	SaveReg()
 EndFunction
 
 Float Function GetStashFlt(ObjectReference akStashRef, String asKey) Global
 	asKey = MakePath(asKey)
-	Float fRet = -2 ; akStashRef is not a Stash
 	Int jStashJMap = GetStashJMap(akStashRef)
 	If jStashJMap
 		Return JValue.solveFlt(jStashJMap,asKey)
 	EndIf
-	Return fRet
+	Return 0
 EndFunction
 
 Function SetStashFlt(ObjectReference akStashRef, String asKey, Float afValue) Global
 	asKey = MakePath(asKey)
-	JValue.solveFltSetter(GetStashJMap(akStashRef,True),asKey,afValue)
+	JValue.solveFltSetter(GetStashJMap(akStashRef,True),asKey,afValue,True)
 	SaveReg()
 EndFunction
 
 String Function GetStashStr(ObjectReference akStashRef, String asKey) Global
 	asKey = MakePath(asKey)
-	String sRet = ""
 	Int jStashJMap = GetStashJMap(akStashRef)
 	If jStashJMap
 		Return JValue.solveStr(jStashJMap,asKey)
 	EndIf
-	Return sRet
+	Return ""
 EndFunction
 
 Function SetStashStr(ObjectReference akStashRef, String asKey, String asValue) Global
 	asKey = MakePath(asKey)
-	JValue.solveStrSetter(GetStashJMap(akStashRef,True),asKey,asValue)
+	JValue.solveStrSetter(GetStashJMap(akStashRef,True),asKey,asValue,True)
 	SaveReg()
 EndFunction
 
 Form Function GetStashForm(ObjectReference akStashRef, String asKey) Global
 	asKey = MakePath(asKey)
-	Form kRet = None
 	Int jStashJMap = GetStashJMap(akStashRef)
 	If jStashJMap
 		Return JValue.solveForm(jStashJMap,asKey)
 	EndIf
-	Return kRet
+	Return None
 EndFunction
 
 Function SetStashForm(ObjectReference akStashRef, String asKey, Form akValue) Global
 	asKey = MakePath(asKey)
-	JValue.solveFormSetter(GetStashJMap(akStashRef,True),asKey,akValue)
+	JValue.solveFormSetter(GetStashJMap(akStashRef,True),asKey,akValue,True)
 	SaveReg()
 EndFunction
 
 Int Function GetStashObj(ObjectReference akStashRef, String asKey) Global
 	asKey = MakePath(asKey)
-	Int iRet = -2 ; akStashRef is not a Stash
 	Int jStashJMap = GetStashJMap(akStashRef)
 	If jStashJMap
 		Return JValue.solveObj(jStashJMap,asKey)
 	EndIf
-	Return iRet
+	Return 0
 EndFunction
 
 Function SetStashObj(ObjectReference akStashRef, String asKey, Int ajValue) Global
 	asKey = MakePath(asKey)
-	JValue.solveObjSetter(GetStashJMap(akStashRef,True),asKey,ajValue)
+	JValue.solveObjSetter(GetStashJMap(akStashRef,True),asKey,ajValue,True)
 	SaveReg()
 EndFunction
 
@@ -205,10 +199,17 @@ Int Function UpdateStashItems(ObjectReference akStashRef) Global
 			Int iType = iItemTypes[i]
 			Int iCount = iItemCount[i]
 			If iCount > 0 
-				If kItem as ObjectReference
-					(kItem as ObjectReference).MoveTo(kMoveTarget)
-					sItemID = vSS_API_Item.SerializeObject(kItem as ObjectReference)
-					akStashRef.AddItem((kItem as ObjectReference),abSilent = True)
+				If kItem as ObjectReference || kItem as Weapon || kItem as Armor
+					If kItem as ObjectReference
+						(kItem as ObjectReference).MoveTo(kMoveTarget)
+						sItemID = vSS_API_Item.SerializeObject(kItem as ObjectReference)
+						akStashRef.AddItem((kItem as ObjectReference),abSilent = True)
+					ElseIf kItem as Weapon || kItem as Armor
+						akStashRef.RemoveItem(kItem,1,True,kContainerTarget)
+						ObjectReference kObject = kContainerTarget.DropObject(kItem, 1)
+						sItemID = vSS_API_Item.SerializeObject(kObject)
+						akStashRef.AddItem(kObject,abSilent = True)
+					EndIf
 				EndIf
 				If sItemID
 					JArray.AddObj(jItemList,vFF_API_Item.GetItemJMap(sItemID))
@@ -221,13 +222,13 @@ Int Function UpdateStashItems(ObjectReference akStashRef) Global
 			EndIf
 		EndIf
 	EndWhile
-	DebugTraceAPIStash("Updated Stash " + akStashRef + ", found " + kStashItems.Length + " items!")
-	
+	DebugTraceAPIStash("Updated Stash " + akStashRef + ", found " + (kStashItems.Length - 1) + " items!")
+	SetStashObj(akStashRef,"Items",jItemList)
 	akStashRef.BlockActivation(False)
 
 	JValue.releaseObjectsWithTag("vSS_" + sStashID)
 
-
+	Return (kStashItems.Length - 1)
 EndFunction
 
 Function DebugTraceAPIStash(String sDebugString, Int iSeverity = 0) Global

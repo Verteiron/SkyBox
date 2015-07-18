@@ -49,6 +49,8 @@ Int 				Property SerializationVersion = 5 				Auto Hidden
 Actor 				Property PlayerRef 								Auto
 {The Player, duh.}
 
+Perk 				Property vSS_StashCheckPerk 					Auto
+
 ObjectReference 	Property ContainerTarget 						Auto
 ObjectReference 	Property MoveTarget		 						Auto
 
@@ -99,6 +101,11 @@ Function DoUpkeep(Bool bInBackground = True)
 	String sMatchedSID = MatchSession()
 	If sMatchedSID
 		SetSessionID(sMatchedSID)
+	EndIf
+
+	If !PlayerREF.HasPerk(vSS_StashCheckPerk)
+		DebugTrace("Adding vSS_StashCheckPerk to Player!")
+		PlayerREF.AddPerk(vSS_StashCheckPerk)
 	EndIf
 
 	;UpgradeRegistryData()
