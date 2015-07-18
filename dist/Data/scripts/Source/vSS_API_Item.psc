@@ -91,7 +91,7 @@ String Function AssignItemID(Int ajObjectInfo) Global
 			If 	(JValue.HasPath(ajObjectInfo,".Enchantment.Effects[0].MagicEffect") && (JValue.SolveForm(jItemInfo,".Enchantment.Effects[0].MagicEffect") == JValue.SolveForm(ajObjectInfo,".Enchantment.Effects[0].MagicEffect"))) || \
 				(JValue.HasPath(ajObjectInfo,".ItemHealthPercent") && (JValue.SolveFlt(jItemInfo,".ItemHealthPercent") == JValue.SolveFlt(ajObjectInfo,".ItemHealthPercent"))) && \
 				(JValue.HasPath(ajObjectInfo,".ItemMaxCharge") && (JValue.SolveFlt(jItemInfo,".ItemMaxCharge") == JValue.SolveFlt(ajObjectInfo,".ItemMaxCharge")))
-				
+				Debug.Trace("vSS/API/Item/AssignItemID: " + kForm + " has a matching ItemID!")
 				Return JArray.GetStr(JItemIDs,i)
 			EndIf
 		ElseIf kForm as Potion
@@ -99,15 +99,15 @@ String Function AssignItemID(Int ajObjectInfo) Global
 			If 	(JValue.HasPath(ajObjectInfo,".Effects[0].Magnitude") && (JValue.SolveFlt(jItemInfo,".Effects[0].Magnitude") == JValue.SolveFlt(ajObjectInfo,".Effects[0].Magnitude"))) && \
 				(JValue.HasPath(ajObjectInfo,".Effects[0].Duration") && (JValue.SolveFlt(jItemInfo,".Effects[0].Duration") == JValue.SolveFlt(ajObjectInfo,".Effects[0].Duration"))) && \
 				(JValue.HasPath(ajObjectInfo,".Effects[0].MagicEffect") && (JValue.SolveForm(jItemInfo,".Effects[0].MagicEffect") == JValue.SolveForm(ajObjectInfo,".Effects[0].MagicEffect")))
-				
+				Debug.Trace("vSS/API/Item/AssignItemID: " + kForm + " has a matching ItemID!")
 				Return JArray.GetStr(JItemIDs,i)
 			EndIf
 		Else
 			Debug.Trace("vSS/API/Item/AssignItemID: " + kForm + " is something I don't know how to check!")
 		EndIf
 	EndWhile
-
-	Return FFUtils.UUID()
+	Debug.Trace("vSS/API/Item/AssignItemID: " + kForm + " has no match, creating a new ItemID!")
+	Return SuperStash.UUID()
 EndFunction
 
 String Function SaveItem(Int ajObjectInfo, String asItemId = "") Global
@@ -161,16 +161,28 @@ EndFunction
 
 String Function SerializeEquipment(ObjectReference akObject) Global
 	Form kItem = akObject.GetBaseObject()
+	
+	ObjectReference kBaseObject = akObject.PlaceAtMe(kItem,abInitiallyDisabled = True)
+	If !akObject.GetEnchantment() && \
+		akObject.GetItemHealthPercent() == kBaseObject.GetItemHealthPercent() && \
+		akObject.GetItemMaxCharge() == kBaseObject.GetItemMaxCharge() && \
+		akObject.GetDisplayName() == kBaseObject.GetDisplayName()
+		;Object is identical to its base, don't bother serializing it 
+		kBaseObject.Delete()
+		Return ""
+	EndIf
+	kBaseObject.Delete()
+
 	Int jItemInfo = JMap.Object()
 
-	JMap.SetForm(jItemInfo,"Form",akObject)
+	JMap.SetForm(jItemInfo,"Form",kItem)
 
 	Bool isWeapon = False
 	Bool isEnchantable = False
 	Bool isTwoHanded = False
 	Enchantment kItemEnchantment
 	If kItem
-		JMap.SetStr(jItemInfo,"Source",FFUtils.GetSourceMod(kItem))
+		JMap.SetStr(jItemInfo,"Source",SuperStash.GetSourceMod(kItem))
 	EndIf
 	If (kItem as Weapon)
 		isWeapon = True
@@ -193,10 +205,10 @@ String Function SerializeEquipment(ObjectReference akObject) Global
 	If kItemEnchantment
 		;PlayerEnchantments[newindex] = kItemEnchantment
 		;Debug.Trace("vSS/CM: " + kItem.GetName() + " has enchantment " + kItemEnchantment.GetFormID() + ", " + kItemEnchantment.GetName())
-		JMap.SetForm(jItemEnchantmentInfo,"Form",kItemEnchantment)
-		JMap.SetStr(jItemInfo,"Source",FFUtils.GetSourceMod(kItemEnchantment))
+		JMap.SetForm(jItemEnchantmentInfo,"Form",kItemEnchantment.GetBaseEnchantment())
+		JMap.SetStr(jItemInfo,"Source",SuperStash.GetSourceMod(kItemEnchantment))
 ;		AddToReqList(kItemEnchantment,"Enchantment")
-		JMap.SetStr(jItemEnchantmentInfo,"Source",FFUtils.GetSourceMod(kItemEnchantment))
+		JMap.SetStr(jItemEnchantmentInfo,"Source",SuperStash.GetSourceMod(kItemEnchantment))
 		JMap.SetInt(jItemEnchantmentInfo,"IsCustom",0)
 	EndIf
 	String sItemDisplayName = akObject.GetDisplayName()
@@ -211,8 +223,8 @@ String Function SerializeEquipment(ObjectReference akObject) Global
 		JMap.SetStr(jItemInfo,"DisplayName",sItemDisplayName)
 		kItemEnchantment = akObject.GetEnchantment()
 		If kItemEnchantment
-			JMap.SetForm(jItemEnchantmentInfo,"Form",kItemEnchantment)
-			JMap.SetStr(jItemEnchantmentInfo,"Source",FFUtils.GetSourceMod(kItemEnchantment))
+			JMap.SetForm(jItemEnchantmentInfo,"Form",kItemEnchantment.GetBaseEnchantment())
+			JMap.SetStr(jItemEnchantmentInfo,"Source",SuperStash.GetSourceMod(kItemEnchantment))
 ;			AddToReqList(kItemEnchantment,"Enchantment")
 			JMap.SetInt(jItemEnchantmentInfo,"IsCustom",1)
 			Int iNumEffects = kItemEnchantment.GetNumEffects()
@@ -225,7 +237,7 @@ String Function SerializeEquipment(ObjectReference akObject) Global
 				JMap.SetFlt(jEffectsInfo, "Area", kItemEnchantment.GetNthEffectArea(j))
 				JMap.SetFlt(jEffectsInfo, "Duration", kItemEnchantment.GetNthEffectDuration(j))
 				JMap.SetForm(jEffectsInfo,"MagicEffect", kItemEnchantment.GetNthEffectMagicEffect(j))
-				JMap.SetStr(jEffectsInfo,"Source",FFUtils.GetSourceMod(kItemEnchantment.GetNthEffectMagicEffect(j)))
+				JMap.SetStr(jEffectsInfo,"Source",SuperStash.GetSourceMod(kItemEnchantment.GetNthEffectMagicEffect(j)))
 ;				AddToReqList(kItemEnchantment.GetNthEffectMagicEffect(j),"MagicEffect")
 				JArray.AddObj(jEffectsArray,jEffectsInfo)
 				j += 1
@@ -385,7 +397,7 @@ String Function SerializePotion(Form akItem) Global
 	
 	JMap.SetStr(jPotionInfo,"Name",kPotion.GetName())
 	JMap.SetStr(jPotionInfo,"WorldModelPath",kPotion.GetWorldModelPath())
-	JMap.SetStr(jPotionInfo,"Source",FFUtils.GetSourceMod(kPotion))
+	JMap.SetStr(jPotionInfo,"Source",SuperStash.GetSourceMod(kPotion))
 	
 	JMap.SetInt(jPotionInfo,"IsHostile",kPotion.IsHostile() as Int)
 	JMap.SetInt(jPotionInfo,"IsFood",kPotion.IsFood() as Int)
@@ -401,7 +413,7 @@ String Function SerializePotion(Form akItem) Global
 		JMap.SetFlt(jEffectsInfo, "Area", kPotion.GetNthEffectArea(i))
 		JMap.SetFlt(jEffectsInfo, "Duration", kPotion.GetNthEffectDuration(i))
 		JMap.SetForm(jEffectsInfo,"MagicEffect", kPotion.GetNthEffectMagicEffect(i))
-		JMap.SetStr(jEffectsInfo,"Source",FFUtils.GetSourceMod(kPotion))
+		JMap.SetStr(jEffectsInfo,"Source",SuperStash.GetSourceMod(kPotion))
 		;AddToReqList(kPotion.GetNthEffectMagicEffect(i),"MagicEffect")
 		JArray.AddObj(jEffectsArray,jEffectsInfo)
 		i += 1
