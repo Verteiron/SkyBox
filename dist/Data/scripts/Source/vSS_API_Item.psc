@@ -276,7 +276,9 @@ String Function SerializeEquipment(ObjectReference akObject) Global
 ;	EndIf
 	;Debug.Trace("vSS/CM: Finished serializing " + kItem.GetName() + ", JMap count is " + JMap.Count(jItemInfo))
 
-	Return vSS_API_Item.SaveItem(jItemInfo)
+	String sItemID = vSS_API_Item.SaveItem(jItemInfo)
+	SetObjectID(akObject,sItemID)
+	Return sItemID
 EndFunction
 
 ObjectReference Function CreateObject(String asItemID) Global
@@ -286,7 +288,11 @@ ObjectReference Function CreateObject(String asItemID) Global
 		DebugTraceAPIItem("CreateObject: " + asItemID + " is not a valid ItemID!",1)
 		Return None
 	EndIf
-	Return CreateObjectFromJObj(jItem)
+	ObjectReference kObject = CreateObjectFromJObj(jItem)
+	If kObject
+		SetObjectID(kObject,asItemID)
+	EndIf
+	Return kObject
 EndFunction
 
 ObjectReference Function CreateObjectFromJObj(Int ajObjectInfo) Global
@@ -457,6 +463,20 @@ ObjectReference Function CreatePotion(String asItemID) Global
 	EndWhile
 	
 	Return kMoveTarget.PlaceAtMe(kPotion,abForcePersist = True)
+EndFunction
+
+ObjectReference Function GetExistingObject(String asItemID) Global
+	Int jItemIDMap 		= GetSessionObj("Items.IDMap")
+	Return JMap.GetForm(jItemIDMap,asItemID) as ObjectReference
+EndFunction
+
+Function SetObjectID(ObjectReference akObject, String asItemID) Global
+	Int jItemIDMap 		= GetSessionObj("Items.IDMap")
+	If !JValue.IsMap(jItemIDMap)
+		jItemIDMap = JMap.Object()
+		SetSessionObj("Items.IDMap",jItemIDMap)
+	EndIf
+	JMap.SetForm(jItemIDMap,asItemID,akObject)
 EndFunction
 
 Function DebugTraceAPIItem(String sDebugString, Int iSeverity = 0) Global
