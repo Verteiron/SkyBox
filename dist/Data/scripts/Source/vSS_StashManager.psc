@@ -194,7 +194,6 @@ EndFunction
 
 String Function MatchSession(String sCharacterName = "", Float fPlayTime = 0.0)
 {Return the UUID of a session that matches the passed name and playtime. Use the current player's data if none supplied.}
-;FIXME: Probably won't use this
 	If !sCharacterName 
 		sCharacterName = PlayerREF.GetActorBase().GetName()
 	EndIf

@@ -470,6 +470,17 @@ ObjectReference Function GetExistingObject(String asItemID) Global
 	Return JMap.GetForm(jItemIDMap,asItemID) as ObjectReference
 EndFunction
 
+String Function GetObjectID(ObjectReference akObject) Global
+	Int jItemIDMap 		= GetSessionObj("Items.IDMap")
+	Int jItemIDArray 	= JMap.AllKeys(jItemIDMap)
+	Int jObjectArray 	= JMap.AllValues(jItemIDMap)
+	Int iObjIndex = JArray.FindForm(jObjectArray,akObject)
+	If iObjIndex >= 0
+		Return JArray.GetStr(jItemIDArray,iObjIndex)
+	EndIf
+	Return ""
+EndFunction
+
 Function SetObjectID(ObjectReference akObject, String asItemID) Global
 	Int jItemIDMap 		= GetSessionObj("Items.IDMap")
 	If !JValue.IsMap(jItemIDMap)

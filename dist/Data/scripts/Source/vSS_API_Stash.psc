@@ -37,7 +37,46 @@ Int Function GetStashJMap(ObjectReference akStashRef, Bool abCreateIfMissing = F
 	Return 0
 EndFunction
 
+Int Function GetStashSessionFormMap() Global
+	Int jStashFormMap = GetSessionObj("StashFormMap")
+	If jStashFormMap
+		Return jStashFormMap
+	EndIf
+	jStashFormMap = JFormMap.Object()
+	SetSessionObj("StashFormMap",jStashFormMap)
+	Return jStashFormMap
+EndFunction
+
+Int Function GetStashSessionJMap(ObjectReference akStashRef, Bool abCreateIfMissing = False) Global
+	Int jStashFormMap = GetStashSessionFormMap()
+	Int jStashJMap = JFormMap.GetObj(jStashFormMap,akStashRef)
+	If JValue.isMap(jStashJMap)
+		Return jStashJMap
+	EndIf
+	If abCreateIfMissing
+		jStashJMap = JMap.object()
+		JFormMap.SetObj(jStashFormMap,akStashRef,jStashJMap)
+		Return jStashJMap
+	EndIf
+	Return 0
+EndFunction
+
 ;=== Generic Get/Set Functions ===--
+
+Int Function GetStashSessionInt(ObjectReference akStashRef, String asKey) Global
+	asKey = MakePath(asKey)
+	Int jStashJMap = GetStashSessionJMap(akStashRef)
+	If jStashJMap
+		Return JValue.solveInt(jStashJMap,asKey)
+	EndIf
+	Return 0
+EndFunction
+
+Function SetStashSessionInt(ObjectReference akStashRef, String asKey, Int aiValue) Global
+	asKey = MakePath(asKey)
+	JValue.solveIntSetter(GetStashSessionJMap(akStashRef,True),asKey,aiValue,True)
+	SaveReg()
+EndFunction
 
 Int Function GetStashInt(ObjectReference akStashRef, String asKey) Global
 	asKey = MakePath(asKey)
@@ -190,9 +229,21 @@ Int Function ImportStashItems(ObjectReference akStashRef) Global
 		DebugTraceAPIStash("Error! " + akStashRef + " is busy!")
 		Return 0
 	EndIf
+	
+	Int iDataSerial = GetStashInt(akStashRef,"DataSerial")
+	Int iStashSerial = GetStashSessionInt(akStashRef,"DataSerial")
+
+	If iDataSerial == iStashSerial
+		DebugTraceAPIStash(akStashRef + " is already up to date!")
+		Return 0
+	EndIf
+
 	SetStashInt(akStashRef,"Busy",1)
 
 	vSS_StashManager StashManager = Quest.GetQuest("vSS_StashManagerQuest") as vSS_StashManager
+
+	String sSessionID = GetSessionStr("SessionID")
+	Float fSessionTime = Game.GetRealHoursPassed()
 
 	ObjectReference kMoveTarget 		= StashManager.MoveTarget
 	ObjectReference kContainerTarget 	= StashManager.ContainerTarget
@@ -204,6 +255,7 @@ Int Function ImportStashItems(ObjectReference akStashRef) Global
 	Int jItemList = GetStashObj(akStashRef,"Items")
 	If !jItemList
 		DebugTraceAPIStash("Error! " + akStashRef + " is missing its ItemList!")
+		SetStashInt(akStashRef,"Busy",0)
 		Return 0
 	EndIf
 
@@ -215,27 +267,55 @@ Int Function ImportStashItems(ObjectReference akStashRef) Global
 		i -= 1
 		Int jItemMap = JArray.GetObj(jItemList,i)
 		String sItemID = JMap.GetStr(jItemMap,"UUID")
-		If sItemID
-			ObjectReference kObject = vSS_API_Item.CreateObject(sItemID)
+		Int iItemSerial = JMap.GetInt(jItemMap,"DataSerial")
+		If sSessionID == JMap.GetStr(jItemMap,"SessionID") && fSessionTime <= JMap.GetFlt(jItemMap,"SessionTime")
+			DebugTraceAPIStash("Error! " + akStashRef + " - Item's session/timestamp indicates same-session duplication could occur! Item: " + JMap.GetStr(jItemMap,"DisplayName") + " (" + sItemID + ")!")
+		EndIf
+		If sItemID 
+			;Check if this item has already been created in this Session
+			ObjectReference kObject = vSS_API_Item.GetExistingObject(sItemID)
 			If kObject
-				akStashRef.AddItem(kObject, 1, True)
-			Else
-				DebugTraceAPIStash("Error! " + akStashRef + " could not recreate item " + JMap.GetStr(jItemMap,"DisplayName") + " (" + sItemID + ")!")
+				DebugTraceAPIStash(JMap.GetStr(jItemMap,"DisplayName") + " (" + sItemID + ") has already been created in this Session!")
+				If akStashRef.GetItemCount(kObject)
+					akStashRef.RemoveItem(kObject,1,True,kContainerTarget)
+					DebugTraceAPIStash("... and it's already in this Stash object!")
+				EndIf
+			Else ;Item has not been created in this Session
+				kObject = vSS_API_Item.CreateObject(sItemID)
+				If kObject
+					kContainerTarget.AddItem(kObject, 1, True)
+				Else
+					DebugTraceAPIStash("Error! " + akStashRef + " could not recreate item " + JMap.GetStr(jItemMap,"DisplayName") + " (" + sItemID + ")!")
+				EndIf
 			EndIf
 		Else
 			Form kItem = JMap.GetForm(jItemMap,"Form")
 			If kItem 
-				akStashRef.AddItem(kItem, JMap.GetInt(jItemMap,"Count"), abSilent = True)
+				kContainerTarget.AddItem(kItem, JMap.GetInt(jItemMap,"Count"), abSilent = True)
+				; Int iLocalItemCount = akStashRef.GetItemCount(kItem)
+				; Int iSavedItemCount = JMap.GetInt(jItemMap,"Count")
+				; If iLocalItemCount > iSavedItemCount
+				; 	akStashRef.RemoveItem(kItem, iLocalItemCount - iSavedItemCount, abSilent = True)
+				; ElseIf iLocalItemCount < iSavedItemCount
+				; 	kContainerTarget.AddItem(kItem, iSavedItemCount - iLocalItemCount, abSilent = True)
+				; EndIf
 			Else
 				DebugTraceAPIStash("Error! " + akStashRef + " could not load a form!")
 			EndIf
 		EndIf
 	EndWhile
-	If iOriginalItemCount > 0 ;&& iOriginalItemCount != akStashRef.GetContainerForms().Length
-		ExportStashItems(akStashRef)
-	EndIf
-	kContainerShader.Stop(akStashRef)
+
+	akStashRef.RemoveAllItems()
+	kContainerTarget.RemoveAllItems(akStashRef)
+
+	SetStashSessionInt(akStashRef,"DataSerial",iDataSerial)
 	SetStashInt(akStashRef,"Busy",0)
+	
+	;If iOriginalItemCount > 0 ;&& iOriginalItemCount != akStashRef.GetContainerForms().Length
+		;ExportStashItems(akStashRef)
+	;EndIf
+
+	kContainerShader.Stop(akStashRef)
 	akStashRef.BlockActivation(False)
 
 	Return 0
@@ -255,6 +335,7 @@ Int Function ExportStashItems(ObjectReference akStashRef) Global
 		Return 0
 	EndIf
 	SetStashInt(akStashRef,"Busy",1)
+	Int iDataSerial = GetStashInt(akStashRef,"DataSerial") + 1
 
 	Actor PlayerREF = Game.GetPlayer()
 	String sSessionID = GetSessionStr("SessionID")
@@ -271,8 +352,11 @@ Int Function ExportStashItems(ObjectReference akStashRef) Global
 
 	String sStashID = GetFormIDString(akStashRef)
 
-	Int jItemList = JArray.Object()
-	JValue.Retain(jItemList,"vSS_" + sStashID)
+	Int jItemList = GetStashObj(akStashRef,"Items")
+	If !jItemList
+		jItemList = JArray.Object()
+		JValue.Retain(jItemList,"vSS_" + sStashID)
+	EndIf
 
 	Form[] 		kStashItems 	= akStashRef.GetContainerForms()
 	Int[] 		iItemCount 		= SuperStash.GetItemCounts(kStashItems,akStashRef)
@@ -288,6 +372,11 @@ Int Function ExportStashItems(ObjectReference akStashRef) Global
 		If kItem
 			Int iType = iItemTypes[i]
 			Int iCount = iItemCount[i]
+			Int jItemMap = JValue.evalLuaObj(jItemList, "return jc.find(jobject, function (x) return x.form == Form(" + kItem.GetFormID() + ") end)")
+			If jItemMap
+				DebugTraceAPIStash("jItemMap for " + kItem + " exists!")
+			EndIf
+			FIXME: This needs to be better!
 			If iCount > 0 
 				If kItem as ObjectReference || kItem as Weapon || kItem as Armor
 					If kItem as ObjectReference
@@ -301,7 +390,6 @@ Int Function ExportStashItems(ObjectReference akStashRef) Global
 						akStashRef.AddItem(kObject,abSilent = True)
 					EndIf
 				EndIf
-				Int jItemMap
 				If sItemID
 					jItemMap = vSS_API_Item.GetItemJMap(sItemID)
 				Else
@@ -312,11 +400,16 @@ Int Function ExportStashItems(ObjectReference akStashRef) Global
 				JMap.SetStr(jItemMap,"SessionID",sSessionID)
 				JMap.SetStr(jItemMap,"PlayerName",sPlayerName)
 				JMap.SetFlt(jItemMap,"SessionTime",fSessionTime)
+				JMap.SetInt(jItemMap,"DataSerial",iDataSerial)
 				JArray.AddObj(jItemList,jItemMap)
 			EndIf
 		EndIf
 	EndWhile
 	DebugTraceAPIStash("Updated Stash " + akStashRef + ", found " + (kStashItems.Length - 1) + " items!")
+
+	SetStashInt(akStashRef,"DataSerial",iDataSerial)
+	SetStashSessionInt(akStashRef,"DataSerial",iDataSerial)
+	
 	SetStashObj(akStashRef,"Items",jItemList)
 	SetStashStr(akStashRef,"LastSessionID",sSessionID)
 	SetStashFlt(akStashRef,"LastSessionTime",fSessionTime)
