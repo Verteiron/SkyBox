@@ -465,9 +465,9 @@ ObjectReference Function CreatePotion(String asItemID) Global
 	Return kMoveTarget.PlaceAtMe(kPotion,abForcePersist = True)
 EndFunction
 
-ObjectReference Function GetExistingObject(String asItemID) Global
+Form Function GetExistingObject(String asItemID) Global
 	Int jItemIDMap 		= GetSessionObj("Items.IDMap")
-	Return JMap.GetForm(jItemIDMap,asItemID) as ObjectReference
+	Return JMap.GetForm(jItemIDMap,asItemID)
 EndFunction
 
 String Function GetObjectID(ObjectReference akObject) Global
@@ -488,6 +488,7 @@ Function SetObjectID(ObjectReference akObject, String asItemID) Global
 		SetSessionObj("Items.IDMap",jItemIDMap)
 	EndIf
 	JMap.SetForm(jItemIDMap,asItemID,akObject)
+	SaveSession()
 EndFunction
 
 Function DebugTraceAPIItem(String sDebugString, Int iSeverity = 0) Global

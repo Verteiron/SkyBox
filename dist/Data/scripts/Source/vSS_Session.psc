@@ -11,7 +11,6 @@ Scriptname vSS_Session Hidden
 Import vSS_Registry
 
 Function SendSessionEvent(String asPath) Global
-	SaveSession() ;FIXME Temporary debugging
 	Int iHandle = ModEvent.Create("vSS_SessionUpdate")
 	If iHandle
 		ModEvent.PushString(iHandle,asPath)
@@ -25,6 +24,8 @@ EndFunction
 Int Function CreateSessionDataIfMissing() Global
 	Int jSessionData = JDB.solveObj(".vSS.Session")
 	If jSessionData
+		;FIXME: Debugging only!
+		SaveSession()
 		Return jSessionData
 	EndIf
 	Debug.Trace("vSS/Session: First SessionData access, creating JDB key!")

@@ -273,7 +273,7 @@ Int Function ImportStashItems(ObjectReference akStashRef) Global
 		EndIf
 		If sItemID 
 			;Check if this item has already been created in this Session
-			ObjectReference kObject = vSS_API_Item.GetExistingObject(sItemID)
+			ObjectReference kObject = vSS_API_Item.GetExistingObject(sItemID) as ObjectReference
 			If kObject
 				DebugTraceAPIStash(JMap.GetStr(jItemMap,"DisplayName") + " (" + sItemID + ") has already been created in this Session!")
 				If akStashRef.GetItemCount(kObject)
@@ -322,6 +322,31 @@ Int Function ImportStashItems(ObjectReference akStashRef) Global
 
 EndFunction
 
+Bool Function AddStashTransaction(ObjectReference akStashRef, Int ajItemMap) Global
+	Int jStashTransactions = GetStashObj(akStashRef,"Transactions")
+	If !jStashTransactions
+		SetStashObj(akStashRef,"Transactions",JArray.Object())
+		jStashTransactions = GetStashObj(akStashRef,"Transactions")
+	EndIf
+	Int jStashTransaction = JMap.Object()
+	JMap.SetStr(jStashTransaction,"Form",JMap.GetStr(ajItemMap,"Form"))
+	JMap.SetInt(jStashTransaction,"Count",JMap.GetInt(ajItemMap,"Count"))
+	If JMap.GetStr(ajItemMap,"UUID")
+		JMap.SetStr(jStashTransaction,"UUID",JMap.GetStr(ajItemMap,"UUID"))
+	EndIf
+	JArray.AddObj(jStashTransactions,jStashTransaction)
+	SaveReg()
+	Return True
+EndFunction
+
+Int Function GetContainerDiffs(ObjectReference akStashRef) Global
+	If !IsStash(akStashRef)
+		DebugTraceAPIStash("Error! " + akStashRef + " is not a valid Stash!")
+		Return -1
+	EndIf
+
+EndFunction
+
 Int Function ExportStashItems(ObjectReference akStashRef) Global
 	If !IsStash(akStashRef)
 		DebugTraceAPIStash("Error! " + akStashRef + " is not a valid Stash!")
@@ -352,41 +377,119 @@ Int Function ExportStashItems(ObjectReference akStashRef) Global
 
 	String sStashID = GetFormIDString(akStashRef)
 
-	Int jItemList = GetStashObj(akStashRef,"Items")
-	If !jItemList
-		jItemList = JArray.Object()
-		JValue.Retain(jItemList,"vSS_" + sStashID)
+	Int jStashTransactions = GetStashObj(akStashRef,"Transactions")
+	If !jStashTransactions
+		SetStashObj(akStashRef,"Transactions",JArray.Object())
+		jStashTransactions = GetStashObj(akStashRef,"Transactions")
 	EndIf
+	Int jTransItemEntries = JArray.Object()
+
+	Int jStashPrevState = GetStashObj(akStashRef,"Items") 
+	Int jStashState = JArray.Object()
+	JValue.Retain(jStashState,"vSS_" + sStashID)
+	JValue.Retain(jTransItemEntries,"vSS_" + sStashID)
 
 	Form[] 		kStashItems 	= akStashRef.GetContainerForms()
 	Int[] 		iItemCount 		= SuperStash.GetItemCounts(kStashItems,akStashRef)
 	Int[] 		iItemTypes 		= SuperStash.GetItemTypes(kStashItems)
 	String[] 	sItemNames 		= SuperStash.GetItemNames(kStashItems)
-	Int[] 		iItemHasExtra 	= SuperStash.GetItemHasExtraData(kStashItems)
 
-	Int i = kStashItems.Length
+	;First scan for items that have been changed or removed
+	Int i = JArray.Count(jStashPrevState)
 	While i > 0
 		i -= 1
+		Int jItemMap = JArray.GetObj(jStashPrevState,i)
+		If jItemMap
+			Int jTransItemEntry = JMap.Object()
+			Form kForm = JMap.GetForm(jItemMap,"Form")
+			Int iPrevCount = JMap.GetInt(jItemMap,"Count")
+			If kForm
+				JMap.SetForm(jTransItemEntry,"Form",kForm)
+				Int iItemIdx = kStashItems.Find(kForm)
+				If iItemIdx >= 0
+					DebugTraceAPIStash("Checking for changes to " + kForm + ", previous count was " + iPrevCount + ", current count is " + iItemCount[iItemIdx] + "!")
+					If iItemCount[iItemIdx] != iPrevCount
+						JMap.SetInt(jTransItemEntry,"Count",iItemCount[iItemIdx] - iPrevCount)
+					EndIf
+				Else
+					JMap.SetInt(jTransItemEntry,"Count",-iPrevCount)
+				EndIf
+				If JMap.GetInt(jTransItemEntry,"Count") != 0
+					DebugTraceAPIStash(kForm + " changed, adding transaction!")
+					If JMap.HasKey(jItemMap,"UUID")
+						JMap.SetStr(jTransItemEntry,"UUID",JMap.GetStr(jItemMap,"UUID"))
+					EndIf
+					JArray.AddObj(jTransItemEntries,jTransItemEntry)
+				EndIf
+			EndIf
+		EndIf
+	EndWhile
+
+
+	i = kStashItems.Length
+	While i > 0
+		i -= 1
+		Bool bItemInTrans = False
+		Bool bItemUnchanged = False
 		String sItemID = ""
 		Form kItem = kStashItems[i]
 		If kItem
+			Int iTransIdx = JValue.evalLuaInt(jTransItemEntries, "return jc.find(jobject, function (x) return x.form == Form(" + kItem.GetFormID() + ") end)") - 1
+			If iTransIdx >= 0
+				DebugTraceAPIStash(kItem + " is already in transaction!")
+				bItemInTrans = True
+			EndIf
+
 			Int iType = iItemTypes[i]
 			Int iCount = iItemCount[i]
-			Int jItemMap = JValue.evalLuaObj(jItemList, "return jc.find(jobject, function (x) return x.form == Form(" + kItem.GetFormID() + ") end)")
-			If jItemMap
-				DebugTraceAPIStash("jItemMap for " + kItem + " exists!")
+			; Int jTemp = Array.object()
+			; JArray.addObj(jTemp,jStashState)
+			; JArray.addForm(jTemp,kItem)
+			Int jItemMap = 0
+			Int iItemIdx = JValue.evalLuaInt(jStashPrevState, "return jc.find(jobject, function (x) return x.form == Form(" + kItem.GetFormID() + ") end)") - 1
+			If iItemIdx >= 0
+				jItemMap = JArray.GetObj(jStashPrevState,iItemIdx)
 			EndIf
-			FIXME: This needs to be better!
-			If iCount > 0 
+			;DebugTraceAPIStash("jItemMap is " + jItemMap)
+			If jItemMap 
+				;Item is already in the container
+				Int iStashCount = JMap.GetInt(jItemMap,"Count")
+				DebugTraceAPIStash("jItemMap for " + kItem.GetName() + " exists with form " + JMap.Getform(jItemMap,"Form") + " and count " + iStashCount + "!")
+				If JMap.GetStr(jItemMap,"UUID")
+					Form kObject = vSS_API_Item.GetExistingObject(JMap.GetStr(jItemMap,"UUID")) 
+					If kObject
+						If (kObject as ObjectReference).GetBaseObject() == kItem
+							DebugTraceAPIStash("Custom weapon exists in this Session and is already in the Container!")
+							bItemUnchanged = True
+						Else
+							DebugTraceAPIStash("Custom weapon exists in this Session but is NOT in the Container!")	
+						EndIf
+					Else
+						DebugTraceAPIStash("Custom weapon does not yet exist in this Session!")	
+					EndIf
+				ElseIf JMap.GetInt(jItemMap,"Count") == iCount
+					;Item is not a custom one, so if the form and count match we're good
+					DebugTraceAPIStash("Item is not customized!!")
+					bItemUnchanged = True
+				EndIf
+			EndIf
+			If bItemUnchanged
+				JArray.AddObj(jStashState,JValue.DeepCopy(jItemMap))
+			ElseIf iCount > 0 
 				If kItem as ObjectReference || kItem as Weapon || kItem as Armor
 					If kItem as ObjectReference
+						DebugTraceAPIStash(kItem + " is an ObjectReference!")
 						(kItem as ObjectReference).MoveTo(kMoveTarget)
 						sItemID = vSS_API_Item.SerializeObject(kItem as ObjectReference)
 						akStashRef.AddItem((kItem as ObjectReference),abSilent = True)
 					ElseIf kItem as Weapon || kItem as Armor
+						DebugTraceAPIStash(kItem + " is a Weapon or Armor!")
 						akStashRef.RemoveItem(kItem,1,True,kContainerTarget)
 						ObjectReference kObject = kContainerTarget.DropObject(kItem, 1)
-						sItemID = vSS_API_Item.SerializeObject(kObject)
+						sItemID = vSS_API_Item.GetObjectID(kObject)
+						If !sItemID
+							sItemID = vSS_API_Item.SerializeObject(kObject)
+						EndIf
 						akStashRef.AddItem(kObject,abSilent = True)
 					EndIf
 				EndIf
@@ -397,20 +500,36 @@ Int Function ExportStashItems(ObjectReference akStashRef) Global
 					JMap.SetForm(jItemMap,"Form",kItem)
 					JMap.SetInt(jItemMap,"Count",iCount)
 				EndIf
-				JMap.SetStr(jItemMap,"SessionID",sSessionID)
+				JMap.SetStr(jItemMap,"SID",sSessionID)
 				JMap.SetStr(jItemMap,"PlayerName",sPlayerName)
 				JMap.SetFlt(jItemMap,"SessionTime",fSessionTime)
 				JMap.SetInt(jItemMap,"DataSerial",iDataSerial)
-				JArray.AddObj(jItemList,jItemMap)
+				JArray.AddObj(jStashState,jItemMap)
+				If !bItemInTrans
+					DebugTraceAPIStash("Adding " + kItem + " to transactions!")
+					Int jTransItemEntry = JMap.Object()
+					JMap.SetForm(jTransItemEntry,"Form",JMap.GetForm(jItemMap,"Form"))
+					JMap.SetInt(jTransItemEntry,"Count",iCount)
+					If JMap.HasKey(jItemMap,"UUID")
+						JMap.SetStr(jTransItemEntry,"UUID",JMap.GetStr(jItemMap,"UUID"))
+					EndIf
+					JArray.AddObj(jTransItemEntries,jTransItemEntry)
+				EndIf
 			EndIf
 		EndIf
 	EndWhile
-	DebugTraceAPIStash("Updated Stash " + akStashRef + ", found " + (kStashItems.Length - 1) + " items!")
+	DebugTraceAPIStash("Updated Stash " + akStashRef + ", found " + kStashItems.Length + " items!")
+
+	Int jStashTransaction = JMap.Object()
+	JMap.SetStr(jStashTransaction,"SID",sSessionID)
+	JMap.SetFlt(jStashTransaction,"SessionTime",fSessionTime)
+	JMap.SetObj(jStashTransaction,"ItemEntries",jTransItemEntries)
+	JArray.AddObj(jStashTransactions,jStashTransaction)
 
 	SetStashInt(akStashRef,"DataSerial",iDataSerial)
 	SetStashSessionInt(akStashRef,"DataSerial",iDataSerial)
 	
-	SetStashObj(akStashRef,"Items",jItemList)
+	SetStashObj(akStashRef,"Items",jStashState)
 	SetStashStr(akStashRef,"LastSessionID",sSessionID)
 	SetStashFlt(akStashRef,"LastSessionTime",fSessionTime)
 
@@ -420,7 +539,8 @@ Int Function ExportStashItems(ObjectReference akStashRef) Global
 
 	JValue.releaseObjectsWithTag("vSS_" + sStashID)
 
-	Return (kStashItems.Length - 1)
+	JValue.WriteToFile(GetStashJMap(akStashRef),SuperStash.userDirectory() + "Stashes/" + sStashID + ".json")
+	Return kStashItems.Length
 EndFunction
 
 Function DebugTraceAPIStash(String sDebugString, Int iSeverity = 0) Global
