@@ -65,30 +65,38 @@ EndEvent
 ; 	Busy = False
 ; EndEvent
 
-Event OnOpen(ObjectReference akActionRef)
-	DebugTrace("OnOpen(" + akActionRef + ")")
-	
+Event OnActivate(ObjectReference akActionRef)
+	DebugTrace("OnActivate(" + akActionRef + ")")
+EndEvent
+
+Event OnStashOpen()
+	DebugTrace("OnStashOpen()")
 	If !vSS_API_Stash.IsStash(Self.GetReference())
 		vSS_API_Stash.CreateStash(Self.GetReference())
 	EndIf
-
 	_kGlow = Self.GetReference().PlaceAtMe(dunKagrenzelFXActivator, abInitiallyDisabled = True)
-	_kGlow.MoveTo(Self.GetReference(),0,0,Self.GetReference().GetHeight() / 2)
+	_kGlow.MoveTo(Self.GetReference(),0,0,Self.GetReference().GetHeight() * 0.6)
 	_kGlow.SetScale(5)
-	_kGlow.EnableNoWait()
-	;_kGlow.playAnimation("playanim01")
-	;_kGlow.PlayGamebryoAnimation("animIdle02", false, 0.5)
-EndEvent
-
-Event OnClose(ObjectReference akActionRef)
-	DebugTrace("OnClose(" + akActionRef + ")")
-	_kGlow.PlayGamebryoAnimation("mCharge")
+	_kGlow.EnableNoWait(True)
+	Utility.Wait(1)
+	While UI.IsMenuOpen("ContainerMenu")
+		Utility.Wait(0.2)
+	EndWhile
+	_kGlow.PlayGamebryoAnimation("mReady",abStartOver = False, afEaseInTime = 5.0)
 	Int iCount = vSS_API_Stash.ExportStashItems(Self.GetReference())
 	_kGlow.PlayGamebryoAnimation("mCast")
 	Clear()
 	WaitMenuMode(0.5)
 	_kGlow.Disable(True)
 	_kGlow.Delete()
+EndEvent
+
+Event OnOpen(ObjectReference akActionRef)
+	DebugTrace("OnOpen(" + akActionRef + ")")
+EndEvent
+
+Event OnClose(ObjectReference akActionRef)
+	DebugTrace("OnClose(" + akActionRef + ")")
 EndEvent
 
 Function StartTimer(String sTimerLabel)

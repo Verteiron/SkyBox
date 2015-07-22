@@ -8,6 +8,7 @@ Function Fragment_1(ObjectReference akTargetRef, Actor akActor)
 ActiveContainer.Clear()
 ActiveContainer.ForceRefTo(akTargetRef)
 Debug.Trace("vSS/StashCheckPerk: Activate! Active container is " + ActiveContainer.GetReference())
+(ActiveContainer as vSS_ActiveContainer).OnStashOpen()
 ;If !vSS_API_Stash.IsStash(akTargetRef)
 ;vSS_API_Stash.CreateStash(akTargetRef)
 ;EndIf
