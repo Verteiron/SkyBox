@@ -403,6 +403,9 @@ Int Function ExportStashItems(ObjectReference akStashRef) Global
 			Int jTransItemEntry = JMap.Object()
 			Form kForm = JMap.GetForm(jItemMap,"Form")
 			Int iPrevCount = JMap.GetInt(jItemMap,"Count")
+			If JMap.HasKey(jItemMap,"UUID")
+				iPrevCount = 1
+			EndIf
 			If kForm
 				JMap.SetForm(jTransItemEntry,"Form",kForm)
 				Int iItemIdx = kStashItems.Find(kForm)
