@@ -9,15 +9,21 @@ Import vSS_Session
 
 ;=== Properties ===--
 
-Int					Property	MaxThreadCount = 8 	AutoReadOnly Hidden
+Int					Property	MaxThreadCount = 8 			AutoReadOnly Hidden
 
-Bool				Property	Busy				Auto	Hidden
+Bool				Property	Busy						Auto	Hidden
 
-Actor 				Property	PlayerREF			Auto
+Actor 				Property	PlayerREF					Auto
+
+Form 				Property 	MGAugurFX01Static 			Auto
+
+Activator 			Property 	dunKagrenzelFXActivator 	Auto
 
 ;=== Variables ===--
 
 Int _iThreadCount = 0
+
+ObjectReference _kGlow
 
 ;=== Events ===--
 
@@ -66,12 +72,23 @@ Event OnOpen(ObjectReference akActionRef)
 		vSS_API_Stash.CreateStash(Self.GetReference())
 	EndIf
 
+	_kGlow = Self.GetReference().PlaceAtMe(dunKagrenzelFXActivator, abInitiallyDisabled = True)
+	_kGlow.MoveTo(Self.GetReference(),0,0,Self.GetReference().GetHeight() / 2)
+	_kGlow.SetScale(5)
+	_kGlow.EnableNoWait()
+	;_kGlow.playAnimation("playanim01")
+	;_kGlow.PlayGamebryoAnimation("animIdle02", false, 0.5)
 EndEvent
 
 Event OnClose(ObjectReference akActionRef)
 	DebugTrace("OnClose(" + akActionRef + ")")
+	_kGlow.PlayGamebryoAnimation("mCharge")
 	Int iCount = vSS_API_Stash.ExportStashItems(Self.GetReference())
-	
+	_kGlow.PlayGamebryoAnimation("mCast")
+	Clear()
+	WaitMenuMode(0.5)
+	_kGlow.Disable(True)
+	_kGlow.Delete()
 EndEvent
 
 Function StartTimer(String sTimerLabel)

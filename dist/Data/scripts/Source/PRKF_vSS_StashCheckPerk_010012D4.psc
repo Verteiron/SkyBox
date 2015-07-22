@@ -1,12 +1,13 @@
 ;BEGIN FRAGMENT CODE - Do not edit anything between this and the end comment
-;NEXT FRAGMENT INDEX 14
+;NEXT FRAGMENT INDEX 15
 Scriptname PRKF_vSS_StashCheckPerk_010012D4 Extends Perk Hidden
 
 ;BEGIN FRAGMENT Fragment_1
 Function Fragment_1(ObjectReference akTargetRef, Actor akActor)
 ;BEGIN CODE
-Debug.Trace("vSS/StashCheckPerk: Activate!")
+ActiveContainer.Clear()
 ActiveContainer.ForceRefTo(akTargetRef)
+Debug.Trace("vSS/StashCheckPerk: Activate! Active container is " + ActiveContainer.GetReference())
 ;If !vSS_API_Stash.IsStash(akTargetRef)
 ;vSS_API_Stash.CreateStash(akTargetRef)
 ;EndIf
