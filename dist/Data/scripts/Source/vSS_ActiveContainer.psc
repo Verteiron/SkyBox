@@ -99,6 +99,36 @@ Event OnStashOpen()
 	_kGlow.Delete()
 EndEvent
 
+Event OnItemAdded(Form akBaseItem, int aiItemCount, ObjectReference akItemReference, ObjectReference akSourceContainer)
+	;GoToState("ItemMovement")
+	;DebugTrace("OnItemAdded!")
+EndEvent
+
+Event OnItemRemoved(Form akBaseItem, int aiItemCount, ObjectReference akItemReference, ObjectReference akDestContainer)
+	;GoToState("ItemMovement")
+	;DebugTrace("OnItemRemoved!")
+EndEvent
+
+State ItemMovement
+
+	Event OnBeginState()
+		RegisterForSingleUpdate(1)
+	EndEvent
+
+	Event OnItemAdded(Form akBaseItem, int aiItemCount, ObjectReference akItemReference, ObjectReference akSourceContainer)
+		
+	EndEvent
+
+	Event OnItemRemoved(Form akBaseItem, int aiItemCount, ObjectReference akItemReference, ObjectReference akDestContainer)
+		
+	EndEvent
+
+	Event OnUpdate()
+		GoToState("")
+	EndEvent
+
+EndState
+
 Event OnOpen(ObjectReference akActionRef)
 	DebugTrace("OnOpen(" + akActionRef + ")")
 EndEvent
