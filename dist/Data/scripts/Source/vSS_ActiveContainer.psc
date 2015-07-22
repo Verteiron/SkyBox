@@ -19,9 +19,13 @@ Form 				Property 	MGAugurFX01Static 			Auto
 
 Activator 			Property 	dunKagrenzelFXActivator 	Auto
 
+Sound 				Property 	vSS_StashDoneLPSM 			Auto
+
 ;=== Variables ===--
 
 Int _iThreadCount = 0
+
+ObjectReference _SelfRef
 
 ObjectReference _kGlow
 
@@ -71,20 +75,24 @@ EndEvent
 
 Event OnStashOpen()
 	DebugTrace("OnStashOpen()")
-	If !vSS_API_Stash.IsStash(Self.GetReference())
-		vSS_API_Stash.CreateStash(Self.GetReference())
+	_SelfRef = Self.GetReference()
+
+	If !vSS_API_Stash.IsStash(_SelfRef)
+		vSS_API_Stash.CreateStash(_SelfRef)
 	EndIf
-	_kGlow = Self.GetReference().PlaceAtMe(dunKagrenzelFXActivator, abInitiallyDisabled = True)
-	_kGlow.MoveTo(Self.GetReference(),0,0,Self.GetReference().GetHeight() * 0.6)
+	_kGlow = _SelfRef.PlaceAtMe(dunKagrenzelFXActivator, abInitiallyDisabled = True)
+	_kGlow.MoveTo(_SelfRef,0,0,_SelfRef.GetHeight() * 0.6)
 	_kGlow.SetScale(5)
 	_kGlow.EnableNoWait(True)
 	Utility.Wait(1)
 	While UI.IsMenuOpen("ContainerMenu")
 		Utility.Wait(0.2)
 	EndWhile
+	Int iSoundInstance = vSS_StashDoneLPSM.Play(_SelfRef)
 	_kGlow.PlayGamebryoAnimation("mReady",abStartOver = False, afEaseInTime = 5.0)
-	Int iCount = vSS_API_Stash.ExportStashItems(Self.GetReference())
+	Int iCount = vSS_API_Stash.ExportStashItems(_SelfRef)
 	_kGlow.PlayGamebryoAnimation("mCast")
+	Sound.StopInstance(iSoundInstance)
 	Clear()
 	WaitMenuMode(0.5)
 	_kGlow.Disable(True)
@@ -113,5 +121,5 @@ Function StopTimer(String sTimerLabel)
 EndFunction
 
 Function DebugTrace(String sDebugString, Int iSeverity = 0)
-	Debug.Trace("vSS/ActiveContainer/" + Self.GetReference() + ": " + sDebugString,iSeverity)
+	Debug.Trace("vSS/ActiveContainer/" + _SelfRef + ": " + sDebugString,iSeverity)
 EndFunction
