@@ -52,6 +52,7 @@ Actor 				Property PlayerRef 								Auto
 Perk 				Property vSS_StashCheckPerk 					Auto
 
 ObjectReference 	Property ContainerTarget 						Auto
+ObjectReference 	Property ContainerTemp	 						Auto
 ObjectReference 	Property MoveTarget		 						Auto
 
 EffectShader   		Property ContainerFXShader 						Auto
