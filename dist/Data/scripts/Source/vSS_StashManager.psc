@@ -55,6 +55,8 @@ ObjectReference 	Property ContainerTarget 						Auto
 ObjectReference 	Property ContainerTemp	 						Auto
 ObjectReference 	Property MoveTarget		 						Auto
 
+vSS_WeaponScanner[]	Property WeaponScanners							Auto
+
 EffectShader   		Property ContainerFXShader 						Auto
 
 ;=== Variables ===--

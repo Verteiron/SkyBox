@@ -90,7 +90,7 @@ Event OnStashOpen()
 	EndWhile
 	Int iSoundInstance = vSS_StashDoneLPSM.Play(_SelfRef)
 	_kGlow.PlayGamebryoAnimation("mReady",abStartOver = False, afEaseInTime = 5.0)
-	Int iCount = vSS_API_Stash.ProcessPending(_SelfRef) ;vSS_API_Stash.ExportStashItems(_SelfRef)
+	Int iCount = vSS_API_Stash.ExportStashItems(_SelfRef)
 	_kGlow.PlayGamebryoAnimation("mCast")
 	Sound.StopInstance(iSoundInstance)
 	Clear()
@@ -99,50 +99,50 @@ Event OnStashOpen()
 	_kGlow.Delete()
 EndEvent
 
-Event OnItemAdded(Form akBaseItem, int aiItemCount, ObjectReference akItemReference, ObjectReference akSourceContainer)
-	_iThreadCount += 1
-	If _iThreadCount >= MaxThreadCount
-		GoToState("ItemMovement")
-	EndIf
-	;DebugTrace("OnItemAdded!")
-	vSS_API_Stash.AddStashItem(_SelfRef,akBaseItem, aiItemCount, akItemReference)
-	;GoToState("")
-	_iThreadCount -= 1
-EndEvent
+; Event OnItemAdded(Form akBaseItem, int aiItemCount, ObjectReference akItemReference, ObjectReference akSourceContainer)
+; 	_iThreadCount += 1
+; 	If _iThreadCount >= MaxThreadCount
+; 		GoToState("ItemMovement")
+; 	EndIf
+; 	;DebugTrace("OnItemAdded!")
+; 	vSS_API_Stash.AddStashItem(_SelfRef,akBaseItem, aiItemCount, akItemReference)
+; 	;GoToState("")
+; 	_iThreadCount -= 1
+; EndEvent
 
-Event OnItemRemoved(Form akBaseItem, int aiItemCount, ObjectReference akItemReference, ObjectReference akDestContainer)
-	_iThreadCount += 1
-	If _iThreadCount >= MaxThreadCount
-		GoToState("ItemMovement")
-	EndIf
-	;GoToState("ItemMovement")
-	;GoToState("ItemMovement")
-	;DebugTrace("OnItemRemoved!")
-	vSS_API_Stash.RemoveStashItem(_SelfRef,akBaseItem, aiItemCount, akItemReference)
-	;GoToState("")
-	_iThreadCount -= 1
-EndEvent
+; Event OnItemRemoved(Form akBaseItem, int aiItemCount, ObjectReference akItemReference, ObjectReference akDestContainer)
+; 	_iThreadCount += 1
+; 	If _iThreadCount >= MaxThreadCount
+; 		GoToState("ItemMovement")
+; 	EndIf
+; 	;GoToState("ItemMovement")
+; 	;GoToState("ItemMovement")
+; 	;DebugTrace("OnItemRemoved!")
+; 	vSS_API_Stash.RemoveStashItem(_SelfRef,akBaseItem, aiItemCount, akItemReference)
+; 	;GoToState("")
+; 	_iThreadCount -= 1
+; EndEvent
 
-State ItemMovement
+; State ItemMovement
 
-	Event OnBeginState()
-		RegisterForSingleUpdate(1)
-	EndEvent
+; 	Event OnBeginState()
+; 		RegisterForSingleUpdate(1)
+; 	EndEvent
 
-	Event OnItemAdded(Form akBaseItem, int aiItemCount, ObjectReference akItemReference, ObjectReference akSourceContainer)
+; 	Event OnItemAdded(Form akBaseItem, int aiItemCount, ObjectReference akItemReference, ObjectReference akSourceContainer)
 		
-	EndEvent
+; 	EndEvent
 
-	Event OnItemRemoved(Form akBaseItem, int aiItemCount, ObjectReference akItemReference, ObjectReference akDestContainer)
+; 	Event OnItemRemoved(Form akBaseItem, int aiItemCount, ObjectReference akItemReference, ObjectReference akDestContainer)
 		
-	EndEvent
+; 	EndEvent
 
-	Event OnUpdate()
-		_iThreadCount = 0
-		GoToState("")
-	EndEvent
+; 	Event OnUpdate()
+; 		_iThreadCount = 0
+; 		GoToState("")
+; 	EndEvent
 
-EndState
+; EndState
 
 Event OnOpen(ObjectReference akActionRef)
 	DebugTrace("OnOpen(" + akActionRef + ")")

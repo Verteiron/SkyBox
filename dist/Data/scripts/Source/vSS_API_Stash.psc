@@ -356,17 +356,29 @@ EndFunction
 Int Function ScanContainer(ObjectReference akStashRef) Global
 
 	vSS_StashManager StashManager = Quest.GetQuest("vSS_StashManagerQuest") as vSS_StashManager
-	ObjectReference kMoveTarget 		= StashManager.MoveTarget
-	ObjectReference kContainerTarget 	= StashManager.ContainerTarget
+	ObjectReference 	kMoveTarget 		= StashManager.MoveTarget
+	ObjectReference 	kContainerTarget 	= StashManager.ContainerTarget
+	ObjectReference 	kContainerTemp 		= StashManager.ContainerTemp
+	vSS_WeaponScanner[] WeaponScanners		= StashManager.WeaponScanners
 
 	Int 		jContainerState	= JArray.Object()
+	JValue.AddToPool(jContainerState,"vSS_ScanState")
+
+	Int i = WeaponScanners.Length
+	While i > 0
+		i -= 1
+		WeaponScanners[i].Index = i
+		WeaponScanners[i].jContainerState = jContainerState
+	EndWhile
 
 	Form[] 		kStashItems 	= akStashRef.GetContainerForms()
 	Int[] 		iItemCount 		= SuperStash.GetItemCounts(kStashItems,akStashRef)
 	Int[] 		iItemTypes 		= SuperStash.GetItemTypes(kStashItems)
 	String[] 	sItemNames 		= SuperStash.GetItemNames(kStashItems)
+	;Int[] 		iItemExtraData 	= SuperStash.GetItemHasExtraData(kStashItems)
 
-	Int i = kStashItems.Length
+	;Int i = kStashItems.Length
+	i = akStashRef.GetNumItems()
 
 	DebugTraceAPIStash("Scanning " + i + " forms in " + akStashRef + "...")
 	While i > 0
@@ -378,17 +390,51 @@ Int Function ScanContainer(ObjectReference akStashRef) Global
 		Form kItem = kStashItems[i]
 		Int iType = iItemTypes[i]
 		Int iCount = iItemCount[i]
+		; Bool bExtraData = iItemExtraData[i] as Bool
+		; Form kItem = akStashRef.GetNthForm(i)
+		; Int iType = kItem.GetType()
+		; Int iCount = akStashRef.GetItemCount(kItem)
+
 		Int jItemMap = 0
 
 		DebugTraceAPIStash("Scanning " + iCount + " of Form " + kItem + "...")
 
 		If kItem
 			If iCount > 0 
-				jItemMap = _CreateItemMap(akStashRef,kMoveTarget,kContainerTarget,kItem,iCount,iType)
+				If kItem as ObjectReference || iType == 41 || iType == 26 ; Weapon or Armor
+					If kItem as ObjectReference
+						DebugTraceAPIStash(kItem + " is an ObjectReference!")
+						(kItem as ObjectReference).MoveTo(kMoveTarget)
+						sItemID = vSS_API_Item.SerializeObject(kItem as ObjectReference)
+						akStashRef.AddItem((kItem as ObjectReference),abSilent = True)
+					ElseIf iType == 41 || iType == 26 ; Weapon or Armor
+						DebugTraceAPIStash(kItem + " is a Weapon or Armor!")
+						akStashRef.RemoveItem(kItem,iCount,True,WeaponScanners[i % 4])
+						; ObjectReference kObject = kContainerTarget.DropObject(kItem, 1)
+						; sItemID = vSS_API_Item.GetObjectID(kObject)
+						; If !sItemID
+						; 	sItemID = vSS_API_Item.SerializeObject(kObject)
+						; EndIf
+						; akStashRef.AddItem(kObject,abSilent = True)
+					EndIf
+				EndIf
+				If sItemID
+					jItemMap = vSS_API_Item.GetItemJMap(sItemID)
+				Else
+					jItemMap = JMap.Object()
+					JMap.SetForm(jItemMap,"Form",kItem)
+					JMap.SetInt(jItemMap,"Count",iCount)
+				EndIf
 				JArray.AddObj(jContainerState,jItemMap)
 			EndIf
 		EndIf
 	EndWhile
+
+	While WeaponScanners[0].Busy || WeaponScanners[1].Busy || WeaponScanners[2].Busy || WeaponScanners[3].Busy
+		Utility.WaitMenuMode(0.5)
+		DebugTraceAPIStash("Waiting for weaponscanners...")
+	EndWhile
+	kContainerTarget.RemoveAllItems(akStashRef)
 
 	Return jContainerState
 EndFunction
@@ -510,6 +556,7 @@ Int Function ExportStashItems(ObjectReference akStashRef) Global
 	SetStashInt(akStashRef,"Busy",0)
 
 	JValue.WriteToFile(GetStashJMap(akStashRef),SuperStash.userDirectory() + "Stashes/" + sStashID + ".json")
+	JValue.CleanPool("vSS_ScanState")
 	Return iEntryCount
 EndFunction
 
