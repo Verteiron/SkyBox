@@ -211,6 +211,7 @@ Int Function LoadStashesForCell(Cell akCell) Global
 	While i < iContainerCount
 		ObjectReference kContainer = akCell.GetNthRef(i,28)
 		If IsStash(kContainer)
+			DebugTraceAPIStash("Found Stash " + kContainer + "!")
 			Int iCount = ImportStashItems(kContainer)
 			DebugTraceAPIStash("Imported " + iCount + " items for " + kContainer + ".")
 		EndIf
@@ -263,16 +264,18 @@ Int Function ImportStashItems(ObjectReference akStashRef) Global
 	kContainerShader.Play(akStashRef)
 
 	Int i = JArray.Count(jItemList)
+	DebugTraceAPIStash("Importing " + i + " items for " + akStashRef + "...")
 	While i > 0
 		i -= 1
 		Int jItemMap = JArray.GetObj(jItemList,i)
 		String sItemID = JMap.GetStr(jItemMap,"UUID")
-		Int iItemSerial = JMap.GetInt(jItemMap,"DataSerial")
-		If sSessionID == JMap.GetStr(jItemMap,"SessionID") && fSessionTime <= JMap.GetFlt(jItemMap,"SessionTime")
-			DebugTraceAPIStash("Error! " + akStashRef + " - Item's session/timestamp indicates same-session duplication could occur! Item: " + JMap.GetStr(jItemMap,"DisplayName") + " (" + sItemID + ")!")
-		EndIf
+		;Int iItemSerial = JMap.GetInt(jItemMap,"DataSerial")
+		; If sSessionID == JMap.GetStr(jItemMap,"SessionID") && fSessionTime <= JMap.GetFlt(jItemMap,"SessionTime")
+		; 	DebugTraceAPIStash("Error! " + akStashRef + " - Item's session/timestamp indicates same-session duplication could occur! Item: " + JMap.GetStr(jItemMap,"DisplayName") + " (" + sItemID + ")!")
+		; EndIf
 		If sItemID 
 			;Check if this item has already been created in this Session
+			DebugTraceAPIStash("Checking custom item " + JMap.GetStr(jItemMap,"DisplayName") + "...")
 			ObjectReference kObject = vSS_API_Item.GetExistingObject(sItemID) as ObjectReference
 			If kObject
 				DebugTraceAPIStash(JMap.GetStr(jItemMap,"DisplayName") + " (" + sItemID + ") has already been created in this Session!")
@@ -281,15 +284,18 @@ Int Function ImportStashItems(ObjectReference akStashRef) Global
 					DebugTraceAPIStash("... and it's already in this Stash object!")
 				EndIf
 			Else ;Item has not been created in this Session
+				DebugTraceAPIStash("Item " + JMap.GetStr(jItemMap,"DisplayName") + " doesn't exist in this session, recreating it...")
 				kObject = vSS_API_Item.CreateObject(sItemID)
 				If kObject
 					kContainerTarget.AddItem(kObject, 1, True)
+					DebugTraceAPIStash("Success!")
 				Else
 					DebugTraceAPIStash("Error! " + akStashRef + " could not recreate item " + JMap.GetStr(jItemMap,"DisplayName") + " (" + sItemID + ")!")
 				EndIf
 			EndIf
 		Else
 			Form kItem = JMap.GetForm(jItemMap,"Form")
+			DebugTraceAPIStash("Checking item " + kItem + " (" + JMap.GetInt(jItemMap,"Count") + ")...")
 			If kItem 
 				kContainerTarget.AddItem(kItem, JMap.GetInt(jItemMap,"Count"), abSilent = True)
 				; Int iLocalItemCount = akStashRef.GetItemCount(kItem)
@@ -318,7 +324,7 @@ Int Function ImportStashItems(ObjectReference akStashRef) Global
 	kContainerShader.Stop(akStashRef)
 	akStashRef.BlockActivation(False)
 
-	Return 0
+	Return JArray.Count(jItemList)
 
 EndFunction
 
@@ -364,11 +370,12 @@ Int Function ScanContainer(ObjectReference akStashRef) Global
 	Int 		jContainerState	= JArray.Object()
 	JValue.AddToPool(jContainerState,"vSS_ScanState")
 
-	Int i = WeaponScanners.Length
-	While i > 0
-		i -= 1
+	Int i = 0
+	Int iScannerCount = WeaponScanners.Length
+	While i < iScannerCount
 		WeaponScanners[i].Index = i
 		WeaponScanners[i].jContainerState = jContainerState
+		i += 1
 	EndWhile
 
 	Form[] 		kStashItems 	= akStashRef.GetContainerForms()
@@ -378,13 +385,15 @@ Int Function ScanContainer(ObjectReference akStashRef) Global
 	;Int[] 		iItemExtraData 	= SuperStash.GetItemHasExtraData(kStashItems)
 
 	;Int i = kStashItems.Length
+	Float fStartWeight = akStashRef.GetTotalItemWeight()
 	Int iStartCount = akStashRef.GetNumItems()
 	i = iStartCount
+	DebugTraceAPIStash("Container's starting weight is " + akStashRef)
 
 	DebugTraceAPIStash("Scanning " + i + " forms in " + akStashRef + "...")
 	While i > 0
 		i -= 1
-		Bool bItemInTrans = False
+		Bool bScannedElsewhere = False
 		Bool bItemUnchanged = False
 		String sItemID = ""
 
@@ -410,7 +419,8 @@ Int Function ScanContainer(ObjectReference akStashRef) Global
 						akStashRef.AddItem((kItem as ObjectReference),abSilent = True)
 					ElseIf iType == 41 || iType == 26 ; Weapon or Armor
 						DebugTraceAPIStash(kItem + " is a Weapon or Armor!")
-						akStashRef.RemoveItem(kItem,iCount,True,WeaponScanners[i % 4])
+						akStashRef.RemoveItem(kItem,iCount,True,WeaponScanners[i % iScannerCount])
+						bScannedElsewhere = True
 						; ObjectReference kObject = kContainerTarget.DropObject(kItem, 1)
 						; sItemID = vSS_API_Item.GetObjectID(kObject)
 						; If !sItemID
@@ -419,22 +429,24 @@ Int Function ScanContainer(ObjectReference akStashRef) Global
 						; akStashRef.AddItem(kObject,abSilent = True)
 					EndIf
 				EndIf
-				If sItemID
-					jItemMap = vSS_API_Item.GetItemJMap(sItemID)
-				Else
-					jItemMap = JMap.Object()
-					JMap.SetForm(jItemMap,"Form",kItem)
-					JMap.SetInt(jItemMap,"Count",iCount)
+				If !bScannedElsewhere
+					If sItemID
+						jItemMap = vSS_API_Item.GetItemJMap(sItemID)
+					Else
+						jItemMap = JMap.Object()
+						JMap.SetForm(jItemMap,"Form",kItem)
+						JMap.SetInt(jItemMap,"Count",iCount)
+					EndIf
+					JArray.AddObj(jContainerState,jItemMap)
 				EndIf
-				JArray.AddObj(jContainerState,jItemMap)
 			EndIf
 		EndIf
 	EndWhile
 	kContainerTarget.RemoveAllItems(akStashRef)
-	While akStashRef.GetNumItems() < iStartCount ;|| WeaponScanners[0].Busy || WeaponScanners[1].Busy || WeaponScanners[2].Busy || WeaponScanners[3].Busy
+	While akStashRef.GetNumItems() < iStartCount || akStashRef.GetTotalItemWeight() < fStartWeight || WeaponScanners[0].Busy || WeaponScanners[1].Busy || WeaponScanners[2].Busy || WeaponScanners[3].Busy
 		Utility.WaitMenuMode(0.5)
 		kContainerTarget.RemoveAllItems(akStashRef)
-		DebugTraceAPIStash("Waiting for weaponscanners...")
+		DebugTraceAPIStash("Waiting for weaponscanners, weight is " + akStashRef.GetTotalItemWeight() + "...")
 	EndWhile
 	
 	DebugTraceAPIStash("=== Finished scan of " + akStashRef + " ===--")

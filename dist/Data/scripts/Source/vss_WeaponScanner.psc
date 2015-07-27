@@ -47,6 +47,7 @@ State Scanning
 		Busy = True
 		DebugTrace("Starting item scan loop...")
 		If !jContainerState 
+			DebugTrace("WARNING: Missing jContainerState, this is probably very bad!",1)
 			jContainerState = JArray.Object()
 			JValue.Retain(jContainerState)
 		EndIf
@@ -55,24 +56,24 @@ State Scanning
 	EndEvent
 
 	Event OnUpdate()
-		Int jItemMap = 0
 		Int iNumItems = GetNumItems()
 		While iNumItems
 			DebugTrace("Found " + iNumItems + " items to scan!")
 			Form kItem = GetNthForm(0)
 			Int iCount = 0
+			Int jItemMap = 0
 			While GetItemCount(kItem)
 				iCount += 1
 				ObjectReference kObject = DropObject(kItem, 1)
-				DebugTrace("Processing Object " + kObject + "...")
+				DebugTrace("Processing Object " + kObject + " of Form " + kItem + "...")
 				String sItemID = vSS_API_Item.GetObjectID(kObject)
 				If !sItemID
 					sItemID = vSS_API_Item.SerializeObject(kObject)
 				EndIf
 				If sItemID
-					jItemMap = vSS_API_Item.GetItemJMap(sItemID)
-					If jItemMap
-						JArray.AddObj(jContainerState,jItemMap)
+					Int jCustomItemMap = vSS_API_Item.GetItemJMap(sItemID)
+					If jCustomItemMap
+						JArray.AddObj(jContainerState,jCustomItemMap)
 					EndIf
 				Else
 					jItemMap = JMap.Object()
@@ -80,7 +81,7 @@ State Scanning
 					JMap.SetInt(jItemMap,"Count",iCount)
 				EndIf
 				TargetContainer.AddItem(kObject,1,True)
-				DebugTrace("Added " + kObject + " to TargetContainer!")
+				DebugTrace("Added " + kObject + "(" + kObject.GetDisplayName() + ") to TargetContainer!")
 			EndWhile
 			If jItemMap
 				JArray.AddObj(jContainerState,jItemMap)
