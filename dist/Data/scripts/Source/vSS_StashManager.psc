@@ -84,6 +84,11 @@ Event OnUpdate()
 	RegisterForSingleUpdate(5.0)
 EndEvent
 
+Event OnGameReload()
+	vSS_API_Stash.LoadStashesForCell(PlayerREF.GetParentCell())
+	Parent.OnGameReload()
+EndEvent
+
 ;=== Functions - Startup ===--
 
 Function DoUpkeep(Bool bInBackground = True)
