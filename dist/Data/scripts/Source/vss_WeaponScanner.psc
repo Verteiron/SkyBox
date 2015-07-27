@@ -33,8 +33,10 @@ EndEvent
 
 Event OnUpdate()
 	If GetNumItems()
+		DebugTrace("I still contain items, resuming the scan...")
 		GotoState("Scanning")
 	Else
+		DebugTrace("I contain no items, so I should be done!")
 		Busy = False
 	EndIf
 EndEvent
@@ -85,7 +87,7 @@ State Scanning
 			EndIf
 			iNumItems = GetNumItems()
 		EndWhile
-		RemoveAllItems(TargetContainer)
+		;RemoveAllItems(TargetContainer)
 		GoToState("")
 		RegisterForSingleUpdate(0.1)
 	EndEvent

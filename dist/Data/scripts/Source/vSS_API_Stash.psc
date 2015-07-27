@@ -354,7 +354,7 @@ Int Function _CreateItemMap(ObjectReference akStashRef, ObjectReference akMoveTa
 EndFunction
 
 Int Function ScanContainer(ObjectReference akStashRef) Global
-
+	DebugTraceAPIStash("=== Starting scan of " + akStashRef + " ===--")
 	vSS_StashManager StashManager = Quest.GetQuest("vSS_StashManagerQuest") as vSS_StashManager
 	ObjectReference 	kMoveTarget 		= StashManager.MoveTarget
 	ObjectReference 	kContainerTarget 	= StashManager.ContainerTarget
@@ -378,7 +378,8 @@ Int Function ScanContainer(ObjectReference akStashRef) Global
 	;Int[] 		iItemExtraData 	= SuperStash.GetItemHasExtraData(kStashItems)
 
 	;Int i = kStashItems.Length
-	i = akStashRef.GetNumItems()
+	Int iStartCount = akStashRef.GetNumItems()
+	i = iStartCount
 
 	DebugTraceAPIStash("Scanning " + i + " forms in " + akStashRef + "...")
 	While i > 0
@@ -429,13 +430,14 @@ Int Function ScanContainer(ObjectReference akStashRef) Global
 			EndIf
 		EndIf
 	EndWhile
-
-	While WeaponScanners[0].Busy || WeaponScanners[1].Busy || WeaponScanners[2].Busy || WeaponScanners[3].Busy
+	kContainerTarget.RemoveAllItems(akStashRef)
+	While akStashRef.GetNumItems() < iStartCount ;|| WeaponScanners[0].Busy || WeaponScanners[1].Busy || WeaponScanners[2].Busy || WeaponScanners[3].Busy
 		Utility.WaitMenuMode(0.5)
+		kContainerTarget.RemoveAllItems(akStashRef)
 		DebugTraceAPIStash("Waiting for weaponscanners...")
 	EndWhile
-	kContainerTarget.RemoveAllItems(akStashRef)
-
+	
+	DebugTraceAPIStash("=== Finished scan of " + akStashRef + " ===--")
 	Return jContainerState
 EndFunction
 
