@@ -61,6 +61,65 @@ std::string GetSSDirectory()
 	return path;
 }
 
+UInt32 SSCopyFile(LPCSTR lpExistingFileName, LPCSTR lpNewFileName)
+{
+	UInt32 ret = 0;
+	if (!isReadable(lpExistingFileName))
+	{
+		return ERROR_FILE_NOT_FOUND;
+	}
+	IFileStream::MakeAllDirs(lpNewFileName);
+	if (!CopyFile(lpExistingFileName, lpNewFileName, false)) {
+		UInt32 lastError = GetLastError();
+		ret = lastError;
+		switch (lastError) {
+		case ERROR_FILE_NOT_FOUND: // We don't need to display a message for this
+			break;
+		default:
+			_ERROR("%s - error copying file %s (Error %d)", __FUNCTION__, lpExistingFileName, lastError);
+			break;
+		}
+	}
+	return ret;
+}
+
+UInt32 SSMoveFile(LPCSTR lpExistingFileName, LPCSTR lpNewFileName)
+{
+	UInt32 ret = 0;
+	if (!isReadable(lpExistingFileName))
+	{
+		return ERROR_FILE_NOT_FOUND;
+	}
+	IFileStream::MakeAllDirs(lpNewFileName);
+	if (!MoveFile(lpExistingFileName, lpNewFileName)) {
+		UInt32 lastError = GetLastError();
+		ret = lastError;
+		switch (lastError) {
+		case ERROR_FILE_NOT_FOUND: // We don't need to display a message for this
+			break;
+		default:
+			_ERROR("%s - error moving file %s (Error %d)", __FUNCTION__, lpExistingFileName, lastError);
+			break;
+		}
+	}
+	return ret;
+}
+
+UInt32 SSDeleteFile(LPCSTR lpExistingFileName)
+{
+	UInt32 ret = 0;
+	if (!isReadable(lpExistingFileName))
+	{
+		return ERROR_FILE_NOT_FOUND;
+	}
+	if (!DeleteFile(lpExistingFileName)) {
+		UInt32 lastError = GetLastError();
+		ret = lastError;
+		_ERROR("%s - error moving file %s (Error %d)", __FUNCTION__, lpExistingFileName, lastError);
+	}
+	return ret;
+}
+
 bool IsObjectFavorited(TESForm * form)
 {
 	PlayerCharacter* player = (*g_thePlayer);
@@ -101,6 +160,62 @@ namespace papyrusSuperStash
 	
 	BSFixedString userDirectory(StaticFunctionTag*) {
 		return GetSSDirectory().c_str();
+	}
+
+	SInt32 RotateFile(StaticFunctionTag*, BSFixedString filename, SInt32 maxCount)
+	{
+		SInt32 ret = 0;
+
+		if (maxCount < 1)
+			return ret;
+
+		char sourcePath[MAX_PATH];
+		sprintf_s(sourcePath, "%s", filename);
+
+		char drive[_MAX_DRIVE];
+		char dir[_MAX_DIR];
+		char fname[_MAX_FNAME];
+		char ext[_MAX_EXT];
+		errno_t err;
+
+		err = _splitpath_s(sourcePath, drive, _MAX_DRIVE, dir, _MAX_DIR, fname, _MAX_FNAME, ext, _MAX_EXT);
+		if (err != 0)
+		{
+			_ERROR("%s - error splitting path %s (Error %d)", __FUNCTION__, sourcePath, err);
+			return err;
+		}
+
+		char prevPath[MAX_PATH];
+		char targetPath[MAX_PATH];
+		char prevFilename[_MAX_FNAME];
+		char targetFilename[_MAX_FNAME];
+
+		//delete file.maxCount
+		sprintf_s(targetFilename, "%s.%d", fname, maxCount);
+		_makepath_s(targetPath, _MAX_PATH, drive, dir, targetFilename, ext);
+		err = SSDeleteFile(targetPath);
+		if (err != 0)
+		{
+			_ERROR("%s - error deleting file %s (Error %d)", __FUNCTION__, targetFilename, err);
+			return err;
+		}
+
+		//do file rotation
+		for (int i = maxCount - 1; i >= 0; i--) {
+			sprintf_s(targetFilename, "%s.%d", fname, i + 1);
+			sprintf_s(prevFilename, "%s.%d", fname, i);
+			_makepath_s(targetPath, _MAX_PATH, drive, dir, targetFilename, ext);
+			_makepath_s(prevPath, _MAX_PATH, drive, dir, prevFilename, ext);
+			_DMESSAGE("Moving %s to %s", prevPath, targetPath);
+			SSMoveFile(prevPath, targetPath);
+		}
+
+		//move file.x to file.1.x
+		sprintf_s(targetFilename, "%s.%d", fname, 1);
+		_makepath_s(targetPath, _MAX_PATH, drive, dir, targetFilename, ext);
+		SSMoveFile(sourcePath, targetPath);
+
+		return ret;
 	}
 
 	BSFixedString UUID(StaticFunctionTag*)
@@ -310,6 +425,9 @@ void papyrusSuperStash::RegisterFuncs(VMClassRegistry* registry)
 
 	registry->RegisterFunction(
 		new NativeFunction0<StaticFunctionTag, BSFixedString>("userDirectory", "SuperStash", papyrusSuperStash::userDirectory, registry));
+
+	registry->RegisterFunction(
+		new NativeFunction2<StaticFunctionTag, SInt32, BSFixedString, SInt32>("RotateFile", "SuperStash", papyrusSuperStash::RotateFile, registry));
 
 	registry->RegisterFunction(
 		new NativeFunction0<StaticFunctionTag, BSFixedString>("UUID", "SuperStash", papyrusSuperStash::UUID, registry));

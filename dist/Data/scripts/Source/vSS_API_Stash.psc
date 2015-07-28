@@ -569,7 +569,8 @@ Int Function ExportStashItems(ObjectReference akStashRef) Global
 	akStashRef.BlockActivation(False)
 	SetStashInt(akStashRef,"Busy",0)
 
-	JValue.WriteToFile(GetStashJMap(akStashRef),SuperStash.userDirectory() + "Stashes/" + sStashID + "_" + iDataSerial + ".json")
+	SuperStash.RotateFile(SuperStash.userDirectory() + "Stashes/" + sStashID + ".json")
+	JValue.WriteToFile(GetStashJMap(akStashRef),SuperStash.userDirectory() + "Stashes/" + sStashID + ".json")
 	JValue.CleanPool("vSS_ScanState")
 	Return iEntryCount
 EndFunction

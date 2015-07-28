@@ -16,6 +16,10 @@ Function TraceConsole(String asTrace) native global
 String Function userDirectory() native global
 {Returns "%UserProfile%/My Documents/My Games/Skyrim/SuperStash".}
 
+Int Function RotateFile(String asFileName, Int aiMaxCount = 9) native global
+{Does a UNIX-style file rotation on the file specified by asFileName. 
+ Example.json -> Example.1.json -> Example.2.json -> ... Example.aiMaxCount.json}
+
 String Function UUID() native global
 {Returns a random UUID.}
 
