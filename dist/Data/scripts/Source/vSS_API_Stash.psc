@@ -378,6 +378,15 @@ Int Function ScanContainer(ObjectReference akStashRef) Global
 		i += 1
 	EndWhile
 
+	Int jQuickContainerData = JValue.objectFromPrototype(SuperStash.GetJSONForContainer(akStashRef))
+	JValue.WriteToFile(jQuickContainerData,SuperStash.userDirectory() + "Stashes/quick.json")
+	i = JArray.Count(jQuickContainerData)
+	While i > 0
+		i -= 1
+		DebugTraceAPIStash("Form for " + i + " is " + JMap.GetForm(JArray.GetObj(jQuickContainerData,i),"Form"))
+	EndWhile
+	;DebugTraceAPIStash("JSON for container is: " + SuperStash.GetJSONForContainer(akStashRef))
+
 	Form[] 		kStashItems 	= akStashRef.GetContainerForms()
 	Int[] 		iItemCount 		= SuperStash.GetItemCounts(kStashItems,akStashRef)
 	Int[] 		iItemTypes 		= SuperStash.GetItemTypes(kStashItems)

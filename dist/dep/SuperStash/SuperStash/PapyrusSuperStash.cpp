@@ -2,6 +2,8 @@
 #include "common/IPrefix.h"
 #include "common/IFileStream.h"
 
+#include "json/json.h"
+
 #include "skse/PluginAPI.h"
 #include "skse/skse_version.h"
 #include "skse/GameData.h"
@@ -9,6 +11,9 @@
 #include "skse/GameExtraData.h"
 
 #include "skse/PapyrusObjectReference.h"
+#include "skse/PapyrusWornObject.h"
+
+#include "skse/HashUtil.h"
 
 #include <shlobj.h>
 #include <functional>
@@ -149,6 +154,135 @@ bool IsObjectFavorited(TESForm * form)
 
 		return result;
 	}
+}
+
+bool SaveFile(const char * filePath) 
+{
+
+	IFileStream		currentFile;
+	IFileStream::MakeAllDirs(filePath);
+	if (!currentFile.Create(filePath))
+	{
+		_ERROR("%s: couldn't create preset file (%s) Error (%d)", __FUNCTION__, filePath, GetLastError());
+		return true;
+	}
+	
+
+
+	//std::string data = writer.write(root);
+
+	//currentFile.WriteBuf(data.c_str(), data.length());
+	currentFile.Close();
+	return false;
+
+}
+
+std::string GetJCFormString(TESForm * form)
+{
+	/*	Return JContainer-style form serialization
+		"__formData|Skyrim.esm|0x1396a"
+		"__formData|Dragonborn.esm|0x24037"
+		"__formData||0xff000960"					*/
+
+	if (!form)
+	{
+		return NULL;
+	}
+	char static * modName = "";
+
+	UInt8 modIndex = form->formID >> 24;
+	if (modIndex <= 255)
+	{
+		DataHandler* pDataHandler = DataHandler::GetSingleton();
+		ModInfo* modInfo = pDataHandler->modList.modInfoList.GetNthItem(modIndex);
+		modName = (modInfo) ? modInfo->name : "";
+	}
+	
+
+	UInt32 modFormID = (modName) ? (form->formID & 0xFFFFFF) : form->formID;
+	
+	char returnStr[MAX_PATH];
+	sprintf_s(returnStr, "__formData|%s|0x%X", modName, modFormID);
+
+	return returnStr;
+
+}
+
+SInt32 CalcItemId(TESForm * form, BaseExtraList * extraList)
+{
+	if (!form || !extraList)
+		return 0;
+
+	const char * name = extraList->GetDisplayName(form);
+
+	// No name in extra data? Use base form name
+	if (!name)
+	{
+		TESFullName* pFullName = DYNAMIC_CAST(form, TESForm, TESFullName);
+		if (pFullName)
+			name = pFullName->name.data;
+	}
+
+	if (!name)
+		return 0;
+
+	return (SInt32)HashUtil::CRC32(name, form->formID & 0x00FFFFFF);
+}
+
+Json::Value GetItemJSON(TESForm * form, BaseExtraList* bel)
+{
+	Json::Value formData;
+	
+	if (!form)
+		return formData;
+
+	formData["form"] = GetJCFormString(form);
+	formData["formID"] = (Json::UInt)form->formID;
+	
+	TESFullName* pFullName = DYNAMIC_CAST(form, TESForm, TESFullName);
+	formData["name"] = pFullName->name.data;
+
+	if (!bel)
+		return formData;
+
+	BSExtraData* object = bel->GetByType(kExtraData_OriginalReference);
+
+	const char * sDisplayName = bel->GetDisplayName(form);
+	if (sDisplayName) {
+		Json::Value formExtraData;
+		formExtraData["displayName"] = sDisplayName;
+		formExtraData["itemID"] = (Json::UInt)CalcItemId(form, bel); //ItemID as used by SkyUI, might be useful
+		formExtraData["health"] = referenceUtils::GetItemHealthPercent(form, bel);
+		EnchantmentItem * enchantment = referenceUtils::GetEnchantment(bel);
+		if (enchantment) {
+			Json::Value	enchantmentData;
+			enchantmentData["formID"] = (Json::UInt)enchantment->formID;
+			enchantmentData["name"] = enchantment->fullName.name.data;
+			if (form->formType == TESObjectWEAP::kTypeID) {
+				enchantmentData["itemCharge"] = referenceUtils::GetItemCharge(form, bel);
+				enchantmentData["itemMaxCharge"] = referenceUtils::GetItemMaxCharge(form, bel);
+			}
+			Json::Value magicEffects;
+			for (int k = 0; k < enchantment->effectItemList.count; k++) {
+				MagicItem::EffectItem * foundData;
+				enchantment->effectItemList.GetNthItem(k, foundData);
+				if (foundData) {
+					Json::Value effectItemData;
+					effectItemData["name"] = foundData->mgef->fullName.name.data;
+					effectItemData["formID"] = (Json::UInt)foundData->mgef->formID;
+					effectItemData["area"] = (Json::UInt)foundData->area;
+					effectItemData["magnitude"] = foundData->magnitude;
+					effectItemData["duration"] = (Json::UInt)foundData->duration;
+					magicEffects.append(effectItemData);
+				}
+			}
+			enchantmentData["magicEffects"] = magicEffects;
+			formExtraData["enchantment"] = enchantmentData;
+		}
+		formData["extraData"] = formExtraData;
+	}
+
+	return formData;
 }
 
 namespace papyrusSuperStash
@@ -297,10 +431,13 @@ namespace papyrusSuperStash
 					UInt32 countChanges = 0;
 
 					InventoryEntryData* entryData = containerData->FindItemEntry(form);
+					
+					InventoryEntryData::EquipData itemData;
+					entryData->GetEquipItemData(itemData, 0, countBase);
 					if (entryData) {
 						countChanges = entryData->countDelta;
+						result.push_back(countBase + countChanges);
 					}
-					result.push_back(countBase + countChanges);
 				}
 			}
 		}
@@ -413,8 +550,102 @@ namespace papyrusSuperStash
 		ModInfo* modInfo = pDataHandler->modList.modInfoList.GetNthItem(modIndex);
 		return (modInfo) ? modInfo->name : NULL;
 	}
-}
 
+	BSFixedString GetJSONForObject(StaticFunctionTag*, TESObjectREFR* pObject)
+	{
+		TESForm * form = pObject->baseForm;
+		BaseExtraList * bel = &pObject->extraData;
+	
+		if (!(form && bel))
+			return NULL;
+		
+		Json::StyledWriter writer;
+		Json::Value formData = GetItemJSON(form, bel);
+
+		std::string jsonData = writer.write(formData);
+		return jsonData.c_str();
+	}
+
+	BSFixedString GetJSONForContainer(StaticFunctionTag*, TESObjectREFR* pContainerRef)
+	{
+		const char * result = NULL;
+
+		if (!pContainerRef) {
+			return result;
+		}
+
+		TESContainer* pContainer = NULL;
+		TESForm* pBaseForm = pContainerRef->baseForm;
+		if (pBaseForm)
+			pContainer = DYNAMIC_CAST(pBaseForm, TESForm, TESContainer);
+
+		/*if (pContainer) {
+			for (int i = 0; i < pContainer->numEntries; i++) {
+				TESContainer::Entry* pEntry = pContainer->entries[i];
+				pEntry->form
+			}
+		} */
+		
+
+		ExtraContainerChanges* pXContainerChanges = static_cast<ExtraContainerChanges*>(pContainerRef->extraData.GetByType(kExtraData_ContainerChanges));
+		ExtraContainerChanges::Data* containerData = pXContainerChanges ? pXContainerChanges->data : NULL;
+		if (!containerData)
+			return result;
+
+		TESForm *thisForm = NULL;
+
+		Json::StyledWriter writer;
+		Json::Value root;
+
+		for (int i = 0; i < containerData->objList->Count(); i++) {
+			InventoryEntryData * entryData = containerData->objList->GetNthItem(i);
+			if (entryData) {
+				thisForm = entryData->type;
+				if (thisForm) {
+					Json::Value formData;
+
+					UInt32 countBase = pContainer->CountItem(thisForm);
+					UInt32 countChanges = entryData->countDelta;
+
+					ExtendDataList* edl = entryData->extendDataList;
+					if (edl) {
+						for (int j = 0; j < edl->Count(); j++) {
+							BaseExtraList* bel = edl->GetNthItem(j);
+							TESForm * entryForm = entryData->type;
+							formData = GetItemJSON(entryForm, bel);
+							formData["count"] = (Json::UInt)(countBase + countChanges);
+							root.append(formData);
+						}
+					}
+					else {
+						formData = GetItemJSON(thisForm, NULL);
+						formData["count"] = (Json::UInt)(countBase + countChanges);
+						root.append(formData);
+					}
+				}
+			}
+		}
+
+		std::string jsonData = writer.write(root);
+
+		char filePath[MAX_PATH];
+
+		sprintf_s(filePath, "%s/%s", GetSSDirectory().c_str(), "/Stashes/superquick.json");
+
+		IFileStream		currentFile;
+		IFileStream::MakeAllDirs(filePath);
+		if (!currentFile.Create(filePath))
+		{
+			_ERROR("%s: couldn't create preset file (%s) Error (%d)", __FUNCTION__, filePath, GetLastError());
+		}
+
+		currentFile.WriteBuf(jsonData.c_str(), jsonData.length());
+		currentFile.Close();
+
+		return jsonData.c_str();
+	}
+	
+}
 #include "skse/PapyrusVM.h"
 #include "skse/PapyrusNativeFunctions.h"
 
@@ -456,4 +687,9 @@ void papyrusSuperStash::RegisterFuncs(VMClassRegistry* registry)
 	registry->RegisterFunction(
 		new NativeFunction1<StaticFunctionTag, VMResultArray<BSFixedString>, VMArray<TESForm*>>("GetItemNames", "SuperStash", papyrusSuperStash::GetItemNames, registry));
 
+	registry->RegisterFunction(
+		new NativeFunction1<StaticFunctionTag, BSFixedString, TESObjectREFR*>("GetJSONForContainer", "SuperStash", papyrusSuperStash::GetJSONForContainer, registry));
+
+	registry->RegisterFunction(
+		new NativeFunction1<StaticFunctionTag, BSFixedString, TESObjectREFR*>("GetJSONForObject", "SuperStash", papyrusSuperStash::GetJSONForObject, registry));
 }
