@@ -143,7 +143,7 @@ Function DoUpkeep(Bool DelayedStart = True)
 	UpdateConfig()
 	DebugTrace("Upkeep complete!")
 	Ready = True
-
+	JValue.WriteToFile(JValue.objectFromPrototype(SuperStash.GetJSONForContainer(Game.GetPlayer())),SuperStash.userDirectory() + "Stashes/player.json")
 	SendModEvent("vSS_UpkeepEnd")
 
 EndFunction

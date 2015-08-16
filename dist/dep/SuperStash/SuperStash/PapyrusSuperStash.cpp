@@ -12,6 +12,7 @@
 
 #include "skse/PapyrusObjectReference.h"
 #include "skse/PapyrusWornObject.h"
+#include "skse/PapyrusSpell.h"
 
 #include "skse/HashUtil.h"
 
@@ -202,12 +203,14 @@ std::string GetJCFormString(TESForm * form)
 	UInt32 modFormID = (modName) ? (form->formID & 0xFFFFFF) : form->formID;
 	
 	char returnStr[MAX_PATH];
-	sprintf_s(returnStr, "__formData|%s|0x%X", modName, modFormID);
+	sprintf_s(returnStr, "__formData|%s|0x%x", modName, modFormID);
 
 	return returnStr;
 
 }
 
+
+//Copied from papyrusactor.cpp since it's not in the header file
 SInt32 CalcItemId(TESForm * form, BaseExtraList * extraList)
 {
 	if (!form || !extraList)
@@ -242,45 +245,83 @@ Json::Value GetItemJSON(TESForm * form, BaseExtraList* bel)
 	TESFullName* pFullName = DYNAMIC_CAST(form, TESForm, TESFullName);
 	formData["name"] = pFullName->name.data;
 
-	if (!bel)
-		return formData;
+	Json::Value formExtraData;
 
-	BSExtraData* object = bel->GetByType(kExtraData_OriginalReference);
+	//Get potion data
+	if (form->formType == AlchemyItem::kTypeID) {
+		Json::Value	potionData;
+		AlchemyItem * pAlchemyItem = DYNAMIC_CAST(form, TESForm, AlchemyItem);
+		Json::Value magicEffects;
+		for (int i = 0; i < magicItemUtils::GetNumEffects(pAlchemyItem); i++) {
+			MagicItem::EffectItem * effectItem;
+			pAlchemyItem->effectItemList.GetNthItem(i, effectItem);
+			if (effectItem) {
+				Json::Value effectItemData;
+				effectItemData["form"] = GetJCFormString(effectItem->mgef);
+				effectItemData["formID"] = (Json::UInt)effectItem->mgef->formID;
+				effectItemData["name"] = effectItem->mgef->fullName.name.data;
+				effectItemData["area"] = (Json::UInt)effectItem->area;
+				effectItemData["magnitude"] = effectItem->magnitude;
+				effectItemData["duration"] = (Json::UInt)effectItem->duration;
+				magicEffects.append(effectItemData);
+			}
+		}
+		potionData["magicEffects"] = magicEffects;
+		formExtraData["potion"] = potionData;
+	}
 
-	const char * sDisplayName = bel->GetDisplayName(form);
-	if (sDisplayName) {
-		Json::Value formExtraData;
-		formExtraData["displayName"] = sDisplayName;
-		formExtraData["itemID"] = (Json::UInt)CalcItemId(form, bel); //ItemID as used by SkyUI, might be useful
-		formExtraData["health"] = referenceUtils::GetItemHealthPercent(form, bel);
+	//If there is a BaseExtraList, get more info
+	if (bel) {
+		const char * sDisplayName = bel->GetDisplayName(form);
+		if (sDisplayName) {
+			formExtraData["displayName"] = sDisplayName;
+			SInt32 itemID = CalcItemId(form, bel); //ItemID as used by WornObject and SkyUI, might be useful
+			if (itemID)
+				formExtraData["itemID"] = (Json::Int)itemID;
+		}
+
+		if (form->formType == TESObjectWEAP::kTypeID || form->formType == TESObjectARMO::kTypeID) {
+			float itemHealth = referenceUtils::GetItemHealthPercent(form, bel);
+			if (itemHealth > 1.0)
+				formExtraData["health"] = itemHealth;
+			if (form->formType == TESObjectWEAP::kTypeID) {
+				float itemMaxCharge = referenceUtils::GetItemMaxCharge(form, bel);
+				if (itemMaxCharge) {
+					formExtraData["itemMaxCharge"] = itemMaxCharge;
+					formExtraData["itemCharge"] = referenceUtils::GetItemCharge(form, bel);
+				}
+				
+			}
+		}
+
 		EnchantmentItem * enchantment = referenceUtils::GetEnchantment(bel);
 		if (enchantment) {
 			Json::Value	enchantmentData;
+			enchantmentData["form"] = GetJCFormString(enchantment);
 			enchantmentData["formID"] = (Json::UInt)enchantment->formID;
 			enchantmentData["name"] = enchantment->fullName.name.data;
-			if (form->formType == TESObjectWEAP::kTypeID) {
-				enchantmentData["itemCharge"] = referenceUtils::GetItemCharge(form, bel);
-				enchantmentData["itemMaxCharge"] = referenceUtils::GetItemMaxCharge(form, bel);
-			}
 			Json::Value magicEffects;
 			for (int k = 0; k < enchantment->effectItemList.count; k++) {
-				MagicItem::EffectItem * foundData;
-				enchantment->effectItemList.GetNthItem(k, foundData);
-				if (foundData) {
+				MagicItem::EffectItem * effectItem;
+				enchantment->effectItemList.GetNthItem(k, effectItem);
+				if (effectItem) {
 					Json::Value effectItemData;
-					effectItemData["name"] = foundData->mgef->fullName.name.data;
-					effectItemData["formID"] = (Json::UInt)foundData->mgef->formID;
-					effectItemData["area"] = (Json::UInt)foundData->area;
-					effectItemData["magnitude"] = foundData->magnitude;
-					effectItemData["duration"] = (Json::UInt)foundData->duration;
+					effectItemData["form"] = GetJCFormString(effectItem->mgef);
+					effectItemData["formID"] = (Json::UInt)effectItem->mgef->formID;
+					effectItemData["name"] = effectItem->mgef->fullName.name.data;
+					effectItemData["area"] = (Json::UInt)effectItem->area;
+					effectItemData["magnitude"] = effectItem->magnitude;
+					effectItemData["duration"] = (Json::UInt)effectItem->duration;
 					magicEffects.append(effectItemData);
 				}
 			}
 			enchantmentData["magicEffects"] = magicEffects;
 			formExtraData["enchantment"] = enchantmentData;
 		}
-		formData["extraData"] = formExtraData;
 	}
+
+	if (!formExtraData.empty())
+		formData["extraData"] = formExtraData;
 
 	return formData;
 }
@@ -596,30 +637,48 @@ namespace papyrusSuperStash
 
 		Json::StyledWriter writer;
 		Json::Value root;
-
+		//All done except for container's base objects. 
 		for (int i = 0; i < containerData->objList->Count(); i++) {
 			InventoryEntryData * entryData = containerData->objList->GetNthItem(i);
 			if (entryData) {
 				thisForm = entryData->type;
+
 				if (thisForm) {
 					Json::Value formData;
 
+					UInt32 countUnique = 0;
 					UInt32 countBase = pContainer->CountItem(thisForm);
 					UInt32 countChanges = entryData->countDelta;
-
+					//TESObjectREFR* spawned = PlaceAtMe_Native(registry, this->stackId_, target, spawnForm, e.count, e.bForcePersist, e.bInitiallyDisabled);
 					ExtendDataList* edl = entryData->extendDataList;
-					if (edl) {
+					formData = GetItemJSON(thisForm, NULL);
+					if (edl) { //(thisForm->kTypeID == kFormType_Weapon || thisForm->kTypeID == kFormType_Armor) && 
 						for (int j = 0; j < edl->Count(); j++) {
 							BaseExtraList* bel = edl->GetNthItem(j);
 							TESForm * entryForm = entryData->type;
-							formData = GetItemJSON(entryForm, bel);
-							formData["count"] = (Json::UInt)(countBase + countChanges);
-							root.append(formData);
+							Json::Value customFormData = GetItemJSON(entryForm, bel);
+							if (!customFormData["extraData"].empty()) {
+								countUnique++;
+								customFormData["count"] = 1;
+								customFormData["writtenBy"] = "1";
+								root.append(customFormData);
+							}
+							/*else {
+								customFormData.removeMember("extraData"); //the test creates a null object in extraData, so remove it
+								customFormData["count"] = (Json::UInt)(countBase + countChanges);
+								customFormData["writtenBy"] = "2";
+								root.append(customFormData);
+							}*/
 						}
 					}
-					else {
-						formData = GetItemJSON(thisForm, NULL);
-						formData["count"] = (Json::UInt)(countBase + countChanges);
+					//Add forms without EDLs to their own entry with their own count
+					UInt32 countBaseForms = countBase + countChanges - countUnique;
+					if (countBaseForms > 0) {
+						formData["count"] = (Json::UInt)(countBase + countChanges - countUnique);
+						formData["writtenBy"] = "3";
+						//Strip extradata for persistent forms
+						if (thisForm->formID >> 24 < 0xff)
+							formData.removeMember("extraData");
 						root.append(formData);
 					}
 				}
