@@ -19,9 +19,12 @@
 #include <shlobj.h>
 #include <functional>
 #include <random>
+#include <algorithm>
 
 #include "PapyrusSuperStash.h"
 
+typedef std::vector<InventoryEntryData*> ExtraDataVec;
+typedef std::map<TESForm*, UInt32> ExtraContainerMap;
 
 void VisitFormList(BGSListForm * formList, std::function<void(TESForm*)> functor)
 {
@@ -239,6 +242,10 @@ Json::Value GetItemJSON(TESForm * form, BaseExtraList* bel)
 	if (!form)
 		return formData;
 
+	//Leveled items completely screw things up
+	if (DYNAMIC_CAST(form, TESForm, TESLevItem))
+		return formData;
+	
 	formData["form"] = GetJCFormString(form);
 	formData["formID"] = (Json::UInt)form->formID;
 	
@@ -325,6 +332,150 @@ Json::Value GetItemJSON(TESForm * form, BaseExtraList* bel)
 
 	return formData;
 }
+
+/*
+class ContainerJsonFiller
+{
+	ContainerJson& m_json;
+
+};
+
+
+//Modified from PapyrusObjectReference.cpp!ExtraContainerInfo
+class ContainerJson
+{
+	ExtraDataVec	m_vec;
+	ExtraContainerMap m_map;
+	
+	Json::Value		m_json;
+
+public:
+	ContainerJson(TESObjectREFR * pContainerRef) : m_map(), m_vec()
+	{
+		ExtraContainerChanges* pXContainerChanges = static_cast<ExtraContainerChanges*>(pContainerRef->extraData.GetByType(kExtraData_ContainerChanges));
+		if (!pXContainerChanges)
+			return;
+		EntryDataList * entryList = pXContainerChanges ? pXContainerChanges->data->objList : NULL;
+
+		m_vec.reserve(128);
+		if (entryList) {
+			entryList->Visit(*this);
+		}
+
+		TESContainer* pContainer = NULL;
+		TESForm* pBaseForm = pContainerRef->baseForm;
+		if (pBaseForm)
+			pContainer = DYNAMIC_CAST(pBaseForm, TESForm, TESContainer);
+
+		if (pContainer)
+
+	}
+
+	bool Accept(InventoryEntryData* data)
+	{
+		if (data) {
+			m_vec.push_back(data);
+			m_map[data->type] = m_vec.size() - 1;
+		}
+		return true;
+	}
+
+	bool IsValidEntry(TESContainer::Entry* pEntry, SInt32& numObjects)
+	{
+		if (pEntry) {
+			numObjects = pEntry->count;
+			TESForm* pForm = pEntry->form;
+
+			if (DYNAMIC_CAST(pForm, TESForm, TESLevItem))
+				return false;
+
+			ExtraContainerMap::iterator it = m_map.find(pForm);
+			ExtraContainerMap::iterator itEnd = m_map.end();
+			if (it != itEnd) {
+				UInt32 index = it->second;
+				InventoryEntryData* pXData = m_vec[index];
+				if (pXData) {
+					numObjects += pXData->countDelta;
+				}
+				// clear the object from the vector so we don't bother to look for it
+				// in the second step
+				m_vec[index] = NULL;
+			}
+
+			if (numObjects > 0) {
+				//if (IsConsoleMode()) {
+				//	PrintItemType(pForm);
+				//}
+				return true;
+			}
+		}
+		return false;
+	}
+
+	// returns the count of items left in the vector
+	UInt32 CountItems() {
+		UInt32 count = 0;
+		ExtraDataVec::iterator itEnd = m_vec.end();
+		ExtraDataVec::iterator it = m_vec.begin();
+		while (it != itEnd) {
+			InventoryEntryData* extraData = (*it);
+			if (extraData && (extraData->countDelta > 0)) {
+				count++;
+				//if (IsConsoleMode()) {
+				//	PrintItemType(extraData->type);
+				//}
+			}
+			++it;
+		}
+		return count;
+	}
+
+	// returns the weight of items left in the vector
+	float GetTotalWeight() {
+		float weight = 0.0;
+		ExtraDataVec::iterator itEnd = m_vec.end();
+		ExtraDataVec::iterator it = m_vec.begin();
+		while (it != itEnd) {
+			InventoryEntryData* extraData = (*it);
+			if (extraData && (extraData->countDelta > 0)) {
+				weight += papyrusForm::GetWeight(extraData->type) * extraData->countDelta;
+			}
+			++it;
+		}
+		return weight;
+	}
+
+	void GetRemainingForms(ExtraContainerReceiver * receiver) {
+		ExtraDataVec::iterator itEnd = m_vec.end();
+		ExtraDataVec::iterator it = m_vec.begin();
+		while (it != itEnd) {
+			InventoryEntryData* extraData = (*it);
+			if (extraData && (extraData->countDelta > 0)) {
+				receiver->AddFormToReceiver(extraData->type);
+			}
+			++it;
+		}
+	}
+
+	InventoryEntryData* GetNth(UInt32 n, UInt32 count) {
+		ExtraDataVec::iterator itEnd = m_vec.end();
+		ExtraDataVec::iterator it = m_vec.begin();
+		while (it != itEnd) {
+			InventoryEntryData* extraData = (*it);
+			if (extraData && (extraData->countDelta > 0)) {
+				if (count == n)
+				{
+					return extraData;
+				}
+				count++;
+			}
+			++it;
+		}
+		return NULL;
+	}
+
+};
+*/
 
 namespace papyrusSuperStash
 {
@@ -634,16 +785,18 @@ namespace papyrusSuperStash
 			return result;
 
 		TESForm *thisForm = NULL;
+		std::vector<TESForm *> checkedForms;
 
 		Json::StyledWriter writer;
 		Json::Value root;
-		//All done except for container's base objects. 
+
 		for (int i = 0; i < containerData->objList->Count(); i++) {
 			InventoryEntryData * entryData = containerData->objList->GetNthItem(i);
 			if (entryData) {
 				thisForm = entryData->type;
 
 				if (thisForm) {
+					checkedForms.push_back(thisForm);
 					Json::Value formData;
 
 					UInt32 countUnique = 0;
@@ -676,6 +829,28 @@ namespace papyrusSuperStash
 					if (countBaseForms > 0) {
 						formData["count"] = (Json::UInt)(countBase + countChanges - countUnique);
 						formData["writtenBy"] = "3";
+						//Strip extradata for persistent forms
+						if (thisForm->formID >> 24 < 0xff)
+							formData.removeMember("extraData");
+						root.append(formData);
+					}
+				}
+			}
+		}
+
+
+		std::sort(checkedForms.begin(), checkedForms.end());
+		//All done except for container's base objects. 
+		for (int i = 0; i < pContainer->numEntries; i++) {
+			TESContainer::Entry * pEntry = pContainer->entries[i];
+			if (pEntry) {
+				Json::Value formData;
+				thisForm = pEntry->form;
+				if (thisForm && (!std::binary_search(checkedForms.begin(), checkedForms.end(), thisForm))) {
+					formData = GetItemJSON(thisForm, NULL);
+					if (!formData.empty()) {
+						formData["count"] = (Json::UInt)pEntry->count;
+						formData["writtenBy"] = "0";
 						//Strip extradata for persistent forms
 						if (thisForm->formID >> 24 < 0xff)
 							formData.removeMember("extraData");
