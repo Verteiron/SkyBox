@@ -282,9 +282,9 @@ Json::Value GetItemJSON(TESForm * form, BaseExtraList* bel)
 		const char * sDisplayName = bel->GetDisplayName(form);
 		if (sDisplayName) {
 			formExtraData["displayName"] = sDisplayName;
-			SInt32 itemID = CalcItemId(form, bel); //ItemID as used by WornObject and SkyUI, might be useful
+			/*SInt32 itemID = CalcItemId(form, bel); //ItemID as used by WornObject and SkyUI, might be useful
 			if (itemID)
-				formExtraData["itemID"] = (Json::Int)itemID;
+				formExtraData["itemID"] = (Json::Int)itemID;*/
 		}
 
 		if (form->formType == TESObjectWEAP::kTypeID || form->formType == TESObjectARMO::kTypeID) {
@@ -333,42 +333,35 @@ Json::Value GetItemJSON(TESForm * form, BaseExtraList* bel)
 	return formData;
 }
 
-/*
-class ContainerJsonFiller
-{
-	ContainerJson& m_json;
-
-};
-
-
 //Modified from PapyrusObjectReference.cpp!ExtraContainerInfo
-class ContainerJson
+class ContainerJson 
 {
 	ExtraDataVec	m_vec;
 	ExtraContainerMap m_map;
 	
 	Json::Value		m_json;
 
+	TESObjectREFR*	m_ref;
+	TESContainer*	m_base;
+
 public:
-	ContainerJson(TESObjectREFR * pContainerRef) : m_map(), m_vec()
+	ContainerJson(TESObjectREFR * pContainerRef) : m_map(), m_vec(), m_ref(pContainerRef), m_base()
 	{
+		TESForm* pBaseForm = pContainerRef->baseForm;
+		if (pBaseForm)
+			m_base = DYNAMIC_CAST(pBaseForm, TESForm, TESContainer);
+
 		ExtraContainerChanges* pXContainerChanges = static_cast<ExtraContainerChanges*>(pContainerRef->extraData.GetByType(kExtraData_ContainerChanges));
 		if (!pXContainerChanges)
 			return;
 		EntryDataList * entryList = pXContainerChanges ? pXContainerChanges->data->objList : NULL;
 
+		m_json.clear();
+
 		m_vec.reserve(128);
 		if (entryList) {
 			entryList->Visit(*this);
 		}
-
-		TESContainer* pContainer = NULL;
-		TESForm* pBaseForm = pContainerRef->baseForm;
-		if (pBaseForm)
-			pContainer = DYNAMIC_CAST(pBaseForm, TESForm, TESContainer);
-
-		if (pContainer)
-
 	}
 
 	bool Accept(InventoryEntryData* data)
@@ -376,8 +369,64 @@ public:
 		if (data) {
 			m_vec.push_back(data);
 			m_map[data->type] = m_vec.size() - 1;
+			AppendJsonFromInventoryEntry(data);
 		}
 		return true;
+	}
+
+	void AppendJsonFromContainerEntry(TESContainer::Entry * pEntry)
+	{
+		Json::Value formData;
+		TESForm * thisForm = pEntry->form;
+		if (thisForm) {
+			formData = GetItemJSON(thisForm, NULL);
+			if (!formData.empty()) {
+				formData["count"] = (Json::UInt)pEntry->count;
+				formData["writtenBy"] = "0";
+				//Strip extradata for persistent forms
+				if (thisForm->formID >> 24 < 0xff)
+					formData.removeMember("extraData");
+				m_json.append(formData);
+			}
+		}
+	}
+
+	void AppendJsonFromInventoryEntry(InventoryEntryData * entryData)
+	{
+		TESForm * thisForm = entryData->type;
+		if (!thisForm)
+			return;
+
+		Json::Value formData;
+
+		UInt32 countUnique = 0;
+		UInt32 countBase = m_base->CountItem(thisForm);
+		UInt32 countChanges = entryData->countDelta;
+		ExtendDataList* edl = entryData->extendDataList;
+		formData = GetItemJSON(thisForm, NULL);
+		if (edl) { 
+			for (int j = 0; j < edl->Count(); j++) {
+				BaseExtraList* bel = edl->GetNthItem(j);
+				TESForm * entryForm = entryData->type;
+				Json::Value customFormData = GetItemJSON(entryForm, bel);
+				if (!customFormData["extraData"].empty()) {
+					countUnique++;
+					customFormData["count"] = 1;
+					customFormData["writtenBy"] = "1";
+					m_json.append(customFormData);
+				}
+			}
+		}
+		//Add forms without EDLs to their own entry with their own count
+		UInt32 countBaseForms = countBase + countChanges - countUnique;
+		if (countBaseForms > 0) {
+			formData["count"] = (Json::UInt)(countBase + countChanges - countUnique);
+			formData["writtenBy"] = "3";
+			//Strip extradata for persistent forms
+			if (thisForm->formID >> 24 < 0xff)
+				formData.removeMember("extraData");
+			m_json.append(formData);
+		}
 	}
 
 	bool IsValidEntry(TESContainer::Entry* pEntry, SInt32& numObjects)
@@ -430,33 +479,6 @@ public:
 		return count;
 	}
 
-	// returns the weight of items left in the vector
-	float GetTotalWeight() {
-		float weight = 0.0;
-		ExtraDataVec::iterator itEnd = m_vec.end();
-		ExtraDataVec::iterator it = m_vec.begin();
-		while (it != itEnd) {
-			InventoryEntryData* extraData = (*it);
-			if (extraData && (extraData->countDelta > 0)) {
-				weight += papyrusForm::GetWeight(extraData->type) * extraData->countDelta;
-			}
-			++it;
-		}
-		return weight;
-	}
-
-	void GetRemainingForms(ExtraContainerReceiver * receiver) {
-		ExtraDataVec::iterator itEnd = m_vec.end();
-		ExtraDataVec::iterator it = m_vec.begin();
-		while (it != itEnd) {
-			InventoryEntryData* extraData = (*it);
-			if (extraData && (extraData->countDelta > 0)) {
-				receiver->AddFormToReceiver(extraData->type);
-			}
-			++it;
-		}
-	}
-
 	InventoryEntryData* GetNth(UInt32 n, UInt32 count) {
 		ExtraDataVec::iterator itEnd = m_vec.end();
 		ExtraDataVec::iterator it = m_vec.begin();
@@ -474,8 +496,58 @@ public:
 		return NULL;
 	}
 
+	std::string GetJsonString() {
+		Json::StyledWriter writer;
+		std::string jsonString = writer.write(m_json);
+
+		return jsonString;
+	}
+
+	bool WriteTofile(std::string relativePath) {
+		
+		std::string jsonString = GetJsonString();
+
+		if (!jsonString.length()) {
+			return true;
+		}
+
+		char filePath[MAX_PATH];
+
+		sprintf_s(filePath, "%s/%s", GetSSDirectory().c_str(), relativePath.c_str());
+
+		IFileStream	currentFile;
+		IFileStream::MakeAllDirs(filePath);
+		if (!currentFile.Create(filePath))
+		{
+			_ERROR("%s: couldn't create preset file (%s) Error (%d)", __FUNCTION__, filePath, GetLastError());
+			return true;
+		}
+
+		currentFile.WriteBuf(jsonString.c_str(), jsonString.length());
+		currentFile.Close();
+
+		return false;
+	}
+
 };
-*/
+
+//Modified from PapyrusObjectReference.cpp!ExtraContainerFiller
+class ContainerJsonFiller
+{
+	ContainerJson& m_containerjson;
+public:
+	// ContainerJson(TESObjectREFR * pContainerRef) : m_map(), m_vec(), m_ref(pContainerRef), m_base()
+	ContainerJsonFiller(ContainerJson& c_containerjson) : m_containerjson(c_containerjson) { }
+
+	bool Accept(TESContainer::Entry* pEntry)
+	{
+		SInt32 numItems = 0;
+		if (m_containerjson.IsValidEntry(pEntry, numItems)) {
+			m_containerjson.AppendJsonFromContainerEntry(pEntry);
+		}
+		return true;
+	}
+};
 
 namespace papyrusSuperStash
 {
@@ -771,6 +843,16 @@ namespace papyrusSuperStash
 		if (pBaseForm)
 			pContainer = DYNAMIC_CAST(pBaseForm, TESForm, TESContainer);
 
+		ContainerJson containerJsonData = ContainerJson(pContainerRef);
+		ContainerJsonFiller containerJsonFiller = ContainerJsonFiller(containerJsonData);
+		pContainer->Visit(containerJsonFiller);
+
+		containerJsonData.WriteTofile("/Stashes/superquick.json");
+
+		result = containerJsonData.GetJsonString().c_str();
+
+		return result;
+
 		/*if (pContainer) {
 			for (int i = 0; i < pContainer->numEntries; i++) {
 				TESContainer::Entry* pEntry = pContainer->entries[i];
@@ -780,6 +862,9 @@ namespace papyrusSuperStash
 		
 
 		ExtraContainerChanges* pXContainerChanges = static_cast<ExtraContainerChanges*>(pContainerRef->extraData.GetByType(kExtraData_ContainerChanges));
+
+
+
 		ExtraContainerChanges::Data* containerData = pXContainerChanges ? pXContainerChanges->data : NULL;
 		if (!containerData)
 			return result;
