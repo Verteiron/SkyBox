@@ -25,6 +25,14 @@
 
 typedef std::vector<TESForm*> FormVec;
 
+//Temporary fix until this is implented in SKSE officially.
+class SoulGemEntryData : public InventoryEntryData
+{
+public:
+	//MEMBER_FN_PREFIX(InventoryEntryData);
+	DEFINE_MEMBER_FN(GetSoulLevel, UInt32, 0x004756F0);
+};
+
 void VisitFormList(BGSListForm * formList, std::function<void(TESForm*)> functor)
 {
 	for (int i = 0; i < formList->forms.count; i++)
@@ -211,7 +219,6 @@ std::string GetJCFormString(TESForm * form)
 
 }
 
-
 //Copied from papyrusactor.cpp since it's not in the header file
 SInt32 CalcItemId(TESForm * form, BaseExtraList * extraList)
 {
@@ -234,7 +241,7 @@ SInt32 CalcItemId(TESForm * form, BaseExtraList * extraList)
 	return (SInt32)HashUtil::CRC32(name, form->formID & 0x00FFFFFF);
 }
 
-Json::Value GetItemJSON(TESForm * form, BaseExtraList* bel)
+Json::Value _GetItemJSON(TESForm * form, InventoryEntryData * entryData = NULL, BaseExtraList* bel = NULL)
 {
 	Json::Value formData;
 	
@@ -250,6 +257,8 @@ Json::Value GetItemJSON(TESForm * form, BaseExtraList* bel)
 	
 	TESFullName* pFullName = DYNAMIC_CAST(form, TESForm, TESFullName);
 	formData["name"] = pFullName->name.data;
+
+	_DMESSAGE("Processing %s - %08x ==---", pFullName->name.data, form->formID);
 
 	Json::Value formExtraData;
 
@@ -278,12 +287,20 @@ Json::Value GetItemJSON(TESForm * form, BaseExtraList* bel)
 
 	//Get soulgem data, if any
 	if (form->formType == TESSoulGem::kTypeID) {
-		TESSoulGem * soulgem = DYNAMIC_CAST(form, TESForm, TESSoulGem);
-		TESBoundObject * boundObject = DYNAMIC_CAST(form, TESForm, TESBoundObject);
-		int soulSize = soulgem->soulSize;
-		if (soulSize) {
-			formExtraData["soulSize"] = (Json::UInt)soulSize;
-			formExtraData["gemSize"] = (Json::UInt)soulgem->gemSize;
+		int soulLevel = 0;
+		if (entryData) {
+			SoulGemEntryData * soulgemEntry;
+			soulgemEntry = static_cast<SoulGemEntryData*>(entryData);
+			soulLevel = CALL_MEMBER_FN(soulgemEntry, GetSoulLevel)();
+		}
+		/*else {
+			TESSoulGem * soulgem = DYNAMIC_CAST(form, TESForm, TESSoulGem);
+			TESBoundObject * boundObject = DYNAMIC_CAST(form, TESForm, TESBoundObject);
+			soulLevel = soulgem->soulSize;
+		}*/
+		if (soulLevel) {
+			formExtraData["soulSize"] = (Json::UInt)soulLevel;
+			//_DMESSAGE("SoulLevel: %d", soulLevel);
 		}
 	}
 
@@ -307,7 +324,6 @@ Json::Value GetItemJSON(TESForm * form, BaseExtraList* bel)
 					formExtraData["itemMaxCharge"] = itemMaxCharge;
 					formExtraData["itemCharge"] = referenceUtils::GetItemCharge(form, bel);
 				}
-				
 			}
 		}
 
@@ -335,6 +351,11 @@ Json::Value GetItemJSON(TESForm * form, BaseExtraList* bel)
 			enchantmentData["magicEffects"] = magicEffects;
 			formExtraData["enchantment"] = enchantmentData;
 		}
+
+		/*for (UInt32 i = 1; i < 0xB3; i++) {
+			if (bel->HasType(i))
+				_DMESSAGE("BaseExtraList has type: %0x", i);
+		}*/
 	}
 
 	if (!formExtraData.empty())
@@ -342,6 +363,24 @@ Json::Value GetItemJSON(TESForm * form, BaseExtraList* bel)
 
 	return formData;
 }
+
+Json::Value GetItemJSON(TESForm * form)
+{
+	return _GetItemJSON(form, NULL, NULL);
+}
+Json::Value GetItemJSON(TESForm * form, InventoryEntryData * entryData)
+{
+	return _GetItemJSON(form, entryData, NULL);
+}
+Json::Value GetItemJSON(TESForm * form, InventoryEntryData * entryData, BaseExtraList * bel)
+{
+	return _GetItemJSON(form, entryData, bel);
+}
+Json::Value GetItemJSON(TESForm * form, BaseExtraList * bel)
+{
+	return _GetItemJSON(form, NULL, bel);
+}
+
 
 //Modified from PapyrusObjectReference.cpp!ExtraContainerInfo
 class ContainerJson 
@@ -387,7 +426,7 @@ public:
 		Json::Value formData;
 		TESForm * thisForm = pEntry->form;
 		if (thisForm) {
-			formData = GetItemJSON(thisForm, NULL);
+			formData = GetItemJSON(thisForm);
 			if (!formData.empty()) {
 				formData["count"] = (Json::UInt)pEntry->count;
 				formData["writtenBy"] = "0";
@@ -404,6 +443,7 @@ public:
 		TESForm * thisForm = entryData->type;
 		if (!thisForm)
 			return;
+
 		m_vec.push_back(thisForm);
 		Json::Value formData;
 		UInt32 countUnique = 0;
@@ -414,7 +454,7 @@ public:
 			for (int j = 0; j < edl->Count(); j++) {
 				BaseExtraList* bel = edl->GetNthItem(j);
 				TESForm * entryForm = entryData->type;
-				Json::Value customFormData = GetItemJSON(entryForm, bel);
+				Json::Value customFormData = GetItemJSON(entryForm, entryData, bel);
 				if (!customFormData["extraData"].empty()) {
 					countUnique++;
 					customFormData["count"] = 1;
@@ -426,7 +466,7 @@ public:
 		//Add forms without EDLs to their own entry with their own count
 		UInt32 countBaseForms = countBase + countChanges - countUnique;
 		if (countBaseForms > 0) {
-			formData = GetItemJSON(thisForm, NULL);
+			formData = GetItemJSON(thisForm, entryData);
 			formData["count"] = (Json::UInt)(countBase + countChanges - countUnique);
 			formData["writtenBy"] = "3";
 			//Strip extradata for vanilla potions
