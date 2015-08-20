@@ -33,6 +33,11 @@ public:
 	DEFINE_MEMBER_FN(GetSoulLevel, UInt32, 0x004756F0);
 };
 
+bool IsVanillaPotion(TESForm* potion)
+{
+	return (bool)(potion->formID >> 24 < 0xff && (potion->formType == AlchemyItem::kTypeID));
+}
+
 void VisitFormList(BGSListForm * formList, std::function<void(TESForm*)> functor)
 {
 	for (int i = 0; i < formList->forms.count; i++)
@@ -253,17 +258,17 @@ Json::Value _GetItemJSON(TESForm * form, InventoryEntryData * entryData = NULL, 
 		return formData;
 	
 	formData["form"] = GetJCFormString(form);
-	formData["formID"] = (Json::UInt)form->formID;
+	//formData["formID"] = (Json::UInt)form->formID;
 	
 	TESFullName* pFullName = DYNAMIC_CAST(form, TESForm, TESFullName);
 	formData["name"] = pFullName->name.data;
 
-	_DMESSAGE("Processing %s - %08x ==---", pFullName->name.data, form->formID);
+	//_DMESSAGE("Processing %s - %08x ==---", pFullName->name.data, form->formID);
 
 	Json::Value formExtraData;
 
 	//Get potion data
-	if (form->formType == AlchemyItem::kTypeID) {
+	if (form->formType == AlchemyItem::kTypeID && !IsVanillaPotion(form)) {
 		Json::Value	potionData;
 		AlchemyItem * pAlchemyItem = DYNAMIC_CAST(form, TESForm, AlchemyItem);
 		Json::Value magicEffects;
@@ -273,7 +278,7 @@ Json::Value _GetItemJSON(TESForm * form, InventoryEntryData * entryData = NULL, 
 			if (effectItem) {
 				Json::Value effectItemData;
 				effectItemData["form"] = GetJCFormString(effectItem->mgef);
-				effectItemData["formID"] = (Json::UInt)effectItem->mgef->formID;
+				//effectItemData["formID"] = (Json::UInt)effectItem->mgef->formID;
 				effectItemData["name"] = effectItem->mgef->fullName.name.data;
 				effectItemData["area"] = (Json::UInt)effectItem->area;
 				effectItemData["magnitude"] = effectItem->magnitude;
@@ -283,25 +288,6 @@ Json::Value _GetItemJSON(TESForm * form, InventoryEntryData * entryData = NULL, 
 		}
 		potionData["magicEffects"] = magicEffects;
 		formExtraData["potion"] = potionData;
-	}
-
-	//Get soulgem data, if any
-	if (form->formType == TESSoulGem::kTypeID) {
-		int soulLevel = 0;
-		if (entryData) {
-			SoulGemEntryData * soulgemEntry;
-			soulgemEntry = static_cast<SoulGemEntryData*>(entryData);
-			soulLevel = CALL_MEMBER_FN(soulgemEntry, GetSoulLevel)();
-		}
-		/*else {
-			TESSoulGem * soulgem = DYNAMIC_CAST(form, TESForm, TESSoulGem);
-			TESBoundObject * boundObject = DYNAMIC_CAST(form, TESForm, TESBoundObject);
-			soulLevel = soulgem->soulSize;
-		}*/
-		if (soulLevel) {
-			formExtraData["soulSize"] = (Json::UInt)soulLevel;
-			//_DMESSAGE("SoulLevel: %d", soulLevel);
-		}
 	}
 
 	//If there is a BaseExtraList, get more info
@@ -327,11 +313,21 @@ Json::Value _GetItemJSON(TESForm * form, InventoryEntryData * entryData = NULL, 
 			}
 		}
 
+		if (bel->HasType(kExtraData_Soul)) {
+			ExtraSoul * xSoul = static_cast<ExtraSoul*>(bel->GetByType(kExtraData_Soul));
+			if (xSoul) {
+				//count returns UInt32 but value is UInt16, so strip the garbage
+				UInt16 soulCount = xSoul->count & 0xFFFF;
+				if (soulCount)
+					formExtraData["soulSize"] = (Json::UInt)(xSoul->count & 0xFFFF);
+			}
+		}
+
 		EnchantmentItem * enchantment = referenceUtils::GetEnchantment(bel);
 		if (enchantment) {
 			Json::Value	enchantmentData;
 			enchantmentData["form"] = GetJCFormString(enchantment);
-			enchantmentData["formID"] = (Json::UInt)enchantment->formID;
+			//enchantmentData["formID"] = (Json::UInt)enchantment->formID;
 			enchantmentData["name"] = enchantment->fullName.name.data;
 			Json::Value magicEffects;
 			for (int k = 0; k < enchantment->effectItemList.count; k++) {
@@ -340,7 +336,7 @@ Json::Value _GetItemJSON(TESForm * form, InventoryEntryData * entryData = NULL, 
 				if (effectItem) {
 					Json::Value effectItemData;
 					effectItemData["form"] = GetJCFormString(effectItem->mgef);
-					effectItemData["formID"] = (Json::UInt)effectItem->mgef->formID;
+					//effectItemData["formID"] = (Json::UInt)effectItem->mgef->formID;
 					effectItemData["name"] = effectItem->mgef->fullName.name.data;
 					effectItemData["area"] = (Json::UInt)effectItem->area;
 					effectItemData["magnitude"] = effectItem->magnitude;
@@ -350,6 +346,12 @@ Json::Value _GetItemJSON(TESForm * form, InventoryEntryData * entryData = NULL, 
 			}
 			enchantmentData["magicEffects"] = magicEffects;
 			formExtraData["enchantment"] = enchantmentData;
+		}
+
+		if (!formExtraData.empty()) { //We don't want Count to be the only item in ExtraData
+			ExtraCount* xCount = static_cast<ExtraCount*>(bel->GetByType(kExtraData_Count));
+			if (xCount)
+				formExtraData["count"] = (Json::UInt)(xCount->count & 0xFFFF); //count returns UInt32 but value is UInt16, so strip the garbage
 		}
 
 		/*for (UInt32 i = 1; i < 0xB3; i++) {
@@ -381,7 +383,6 @@ Json::Value GetItemJSON(TESForm * form, BaseExtraList * bel)
 	return _GetItemJSON(form, NULL, bel);
 }
 
-
 //Modified from PapyrusObjectReference.cpp!ExtraContainerInfo
 class ContainerJson 
 {
@@ -406,8 +407,13 @@ public:
 
 		m_json.clear();
 
+		Json::Value jContainerEntries;
+		m_json["containerEntries"] = jContainerEntries;
+
 		m_vec.reserve(128);
 		if (entryList) {
+			Json::Value jEntryDataList;
+			m_json["entryDataList"] = jEntryDataList;
 			entryList->Visit(*this);
 		}
 		std::sort(m_vec.begin(), m_vec.end());
@@ -423,17 +429,14 @@ public:
 
 	void AppendJsonFromContainerEntry(TESContainer::Entry * pEntry)
 	{
-		Json::Value formData;
+		Json::Value jContainerEntry;
 		TESForm * thisForm = pEntry->form;
 		if (thisForm) {
-			formData = GetItemJSON(thisForm);
-			if (!formData.empty()) {
-				formData["count"] = (Json::UInt)pEntry->count;
-				formData["writtenBy"] = "0";
-				//Strip extradata for vanilla potions
-				if (thisForm->formID >> 24 < 0xff && (thisForm->formType == AlchemyItem::kTypeID))
-					formData.removeMember("extraData");
-				m_json.append(formData);
+			jContainerEntry = GetItemJSON(thisForm);
+			if (!jContainerEntry.empty()) {
+				jContainerEntry["count"] = (Json::UInt)pEntry->count;
+				jContainerEntry["writtenBy"] = "0";
+				m_json["containerEntries"].append(jContainerEntry);
 			}
 		}
 	}
@@ -445,35 +448,36 @@ public:
 			return;
 
 		m_vec.push_back(thisForm);
-		Json::Value formData;
-		UInt32 countUnique = 0;
+		Json::Value jInventoryEntryData;
 		UInt32 countBase = m_base->CountItem(thisForm);
 		UInt32 countChanges = entryData->countDelta;
+		UInt32 countTotal = countBase + countChanges;
+
+		if (countTotal > 0) {
+			jInventoryEntryData = GetItemJSON(thisForm, entryData);
+			jInventoryEntryData["count"] = (Json::UInt)(countTotal);
+			jInventoryEntryData["writtenBy"] = "1";
+		}
+
 		ExtendDataList* edl = entryData->extendDataList;
 		if (edl) { 
+			Json::Value jExtendDataList;
 			for (int j = 0; j < edl->Count(); j++) {
 				BaseExtraList* bel = edl->GetNthItem(j);
 				TESForm * entryForm = entryData->type;
-				Json::Value customFormData = GetItemJSON(entryForm, entryData, bel);
-				if (!customFormData["extraData"].empty()) {
-					countUnique++;
-					customFormData["count"] = 1;
-					customFormData["writtenBy"] = "1";
-					m_json.append(customFormData);
+				Json::Value jBaseExtraList = GetItemJSON(entryForm, entryData, bel);
+				if (!jBaseExtraList["extraData"].empty()) {
+					jBaseExtraList["writtenBy"] = "2";
+					jExtendDataList.append(jBaseExtraList);
 				}
 			}
+			if (!jExtendDataList.empty()) {
+				jInventoryEntryData["extendDataList"] = jExtendDataList;
+			}
 		}
-		//Add forms without EDLs to their own entry with their own count
-		UInt32 countBaseForms = countBase + countChanges - countUnique;
-		if (countBaseForms > 0) {
-			formData = GetItemJSON(thisForm, entryData);
-			formData["count"] = (Json::UInt)(countBase + countChanges - countUnique);
-			formData["writtenBy"] = "3";
-			//Strip extradata for vanilla potions
-			if (thisForm->formID >> 24 < 0xff && (thisForm->formType == AlchemyItem::kTypeID))
-				formData.removeMember("extraData");
-			m_json.append(formData);
-		}
+
+		if (!jInventoryEntryData.empty())
+			m_json["entryDataList"].append(jInventoryEntryData);
 	}
 
 	bool IsValidEntry(TESContainer::Entry* pEntry)
@@ -599,7 +603,7 @@ namespace papyrusSuperStash
 			sprintf_s(prevFilename, "%s.%d", fname, i);
 			_makepath_s(targetPath, _MAX_PATH, drive, dir, targetFilename, ext);
 			_makepath_s(prevPath, _MAX_PATH, drive, dir, prevFilename, ext);
-			_DMESSAGE("Moving %s to %s", prevPath, targetPath);
+			//_DMESSAGE("Moving %s to %s", prevPath, targetPath);
 			SSMoveFile(prevPath, targetPath);
 		}
 
