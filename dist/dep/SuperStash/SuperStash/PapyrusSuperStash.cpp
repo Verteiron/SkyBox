@@ -33,9 +33,9 @@ public:
 	DEFINE_MEMBER_FN(GetSoulLevel, UInt32, 0x004756F0);
 };
 
-bool IsVanillaPotion(TESForm* potion)
+bool IsPlayerPotion(TESForm* potion)
 {
-	return (bool)(potion->formID >> 24 < 0xff && (potion->formType == AlchemyItem::kTypeID));
+	return (bool)(potion->formID >> 24 == 0xff && (potion->formType == AlchemyItem::kTypeID));
 }
 
 void VisitFormList(BGSListForm * formList, std::function<void(TESForm*)> functor)
@@ -246,6 +246,117 @@ SInt32 CalcItemId(TESForm * form, BaseExtraList * extraList)
 	return (SInt32)HashUtil::CRC32(name, form->formID & 0x00FFFFFF);
 }
 
+Json::Value _GetExtraDataJSON(TESForm* form, BaseExtraList* bel)
+{
+	Json::Value jBaseExtraList;
+	
+	if (!form || !bel)
+		return jBaseExtraList;
+
+	TESFullName* pFullName = DYNAMIC_CAST(form, TESForm, TESFullName);
+	const char * sDisplayName = bel->GetDisplayName(form);
+
+	if (sDisplayName && (sDisplayName != pFullName->name.data)) {
+		jBaseExtraList["displayName"] = sDisplayName;
+		SInt32 itemID = CalcItemId(form, bel); //ItemID as used by WornObject and SkyUI, might be useful
+		if (itemID)
+			jBaseExtraList["itemID"] = (Json::Int)itemID;
+	}
+
+	if (form->formType == TESObjectWEAP::kTypeID || form->formType == TESObjectARMO::kTypeID) {
+		float itemHealth = referenceUtils::GetItemHealthPercent(form, bel);
+		if (itemHealth > 1.0)
+			jBaseExtraList["health"] = itemHealth;
+		if (form->formType == TESObjectWEAP::kTypeID) {
+			float itemMaxCharge = referenceUtils::GetItemMaxCharge(form, bel);
+			if (itemMaxCharge) {
+				jBaseExtraList["itemMaxCharge"] = itemMaxCharge;
+				jBaseExtraList["itemCharge"] = referenceUtils::GetItemCharge(form, bel);
+			}
+		}
+	}
+
+	if (bel->HasType(kExtraData_Soul)) {
+		ExtraSoul * xSoul = static_cast<ExtraSoul*>(bel->GetByType(kExtraData_Soul));
+		if (xSoul) {
+			//count returns UInt32 but value is UInt8, so strip the garbage
+			UInt16 soulCount = xSoul->count & 0xFF;
+			if (soulCount)
+				jBaseExtraList["soulSize"] = (Json::UInt)(xSoul->count & 0xFF);
+		}
+	}
+
+	EnchantmentItem * enchantment = referenceUtils::GetEnchantment(bel);
+	if (enchantment) {
+		Json::Value	enchantmentData;
+		enchantmentData["form"] = GetJCFormString(enchantment);
+		//enchantmentData["formID"] = (Json::UInt)enchantment->formID;
+		enchantmentData["name"] = enchantment->fullName.name.data;
+		Json::Value magicEffects;
+		for (int k = 0; k < enchantment->effectItemList.count; k++) {
+			MagicItem::EffectItem * effectItem;
+			enchantment->effectItemList.GetNthItem(k, effectItem);
+			if (effectItem) {
+				Json::Value effectItemData;
+				effectItemData["form"] = GetJCFormString(effectItem->mgef);
+				//effectItemData["formID"] = (Json::UInt)effectItem->mgef->formID;
+				effectItemData["name"] = effectItem->mgef->fullName.name.data;
+				effectItemData["area"] = (Json::UInt)effectItem->area;
+				effectItemData["magnitude"] = effectItem->magnitude;
+				effectItemData["duration"] = (Json::UInt)effectItem->duration;
+				magicEffects.append(effectItemData);
+			}
+		}
+		enchantmentData["magicEffects"] = magicEffects;
+		jBaseExtraList["enchantment"] = enchantmentData;
+	}
+
+	if (!jBaseExtraList.empty()) { //We don't want Count to be the only item in ExtraData
+		ExtraCount* xCount = static_cast<ExtraCount*>(bel->GetByType(kExtraData_Count));
+		if (xCount)
+			jBaseExtraList["count"] = (Json::UInt)(xCount->count & 0xFFFF); //count returns UInt32 but value is UInt16, so strip the garbage
+	}
+
+	/*for (UInt32 i = 1; i < 0xB3; i++) {
+	if (bel->HasType(i))
+	_DMESSAGE("BaseExtraList has type: %0x", i);
+	}*/
+	return jBaseExtraList;
+}
+
+bool IsWorthSaving(BaseExtraList * bel) 
+{
+	if (!bel)
+	{
+		return false;
+	}
+	return (bel->HasType(kExtraData_Health)
+		||  bel->HasType(kExtraData_Enchantment)
+		||  bel->HasType(kExtraData_Charge)
+		||  bel->HasType(kExtraData_Soul));
+}
+
+//Modified from PapyrusObjectReference.cpp!ExtraContainerFiller
+class ExtraListJsonFiller
+{
+	TESForm * m_form;
+	Json::Value m_json;
+public:
+	ExtraListJsonFiller(TESForm* form) : m_form(form), m_json() { }
+	bool Accept(BaseExtraList* bel)
+	{
+		if (IsWorthSaving(bel)) {
+			m_json.append(_GetExtraDataJSON(m_form, bel));
+		}
+		return true;
+	}
+
+	Json::Value GetJSON() 
+	{
+		return m_json;
+	}
+};
+
 Json::Value _GetItemJSON(TESForm * form, InventoryEntryData * entryData = NULL, BaseExtraList* bel = NULL)
 {
 	Json::Value formData;
@@ -265,10 +376,8 @@ Json::Value _GetItemJSON(TESForm * form, InventoryEntryData * entryData = NULL, 
 
 	//_DMESSAGE("Processing %s - %08x ==---", pFullName->name.data, form->formID);
 
-	Json::Value formExtraData;
-
-	//Get potion data
-	if (form->formType == AlchemyItem::kTypeID && !IsVanillaPotion(form)) {
+	//Get potion data for player-made potions
+	if (form->formType == AlchemyItem::kTypeID && IsPlayerPotion(form)) {
 		Json::Value	potionData;
 		AlchemyItem * pAlchemyItem = DYNAMIC_CAST(form, TESForm, AlchemyItem);
 		Json::Value magicEffects;
@@ -287,78 +396,13 @@ Json::Value _GetItemJSON(TESForm * form, InventoryEntryData * entryData = NULL, 
 			}
 		}
 		potionData["magicEffects"] = magicEffects;
-		formExtraData["potion"] = potionData;
+		formData["potionData"] = potionData;
 	}
 
 	//If there is a BaseExtraList, get more info
-	if (bel) {
-		const char * sDisplayName = bel->GetDisplayName(form);
-		if (sDisplayName) {
-			formExtraData["displayName"] = sDisplayName;
-			SInt32 itemID = CalcItemId(form, bel); //ItemID as used by WornObject and SkyUI, might be useful
-			if (itemID)
-				formExtraData["itemID"] = (Json::Int)itemID;
-		}
-
-		if (form->formType == TESObjectWEAP::kTypeID || form->formType == TESObjectARMO::kTypeID) {
-			float itemHealth = referenceUtils::GetItemHealthPercent(form, bel);
-			if (itemHealth > 1.0)
-				formExtraData["health"] = itemHealth;
-			if (form->formType == TESObjectWEAP::kTypeID) {
-				float itemMaxCharge = referenceUtils::GetItemMaxCharge(form, bel);
-				if (itemMaxCharge) {
-					formExtraData["itemMaxCharge"] = itemMaxCharge;
-					formExtraData["itemCharge"] = referenceUtils::GetItemCharge(form, bel);
-				}
-			}
-		}
-
-		if (bel->HasType(kExtraData_Soul)) {
-			ExtraSoul * xSoul = static_cast<ExtraSoul*>(bel->GetByType(kExtraData_Soul));
-			if (xSoul) {
-				//count returns UInt32 but value is UInt16, so strip the garbage
-				UInt16 soulCount = xSoul->count & 0xFFFF;
-				if (soulCount)
-					formExtraData["soulSize"] = (Json::UInt)(xSoul->count & 0xFFFF);
-			}
-		}
-
-		EnchantmentItem * enchantment = referenceUtils::GetEnchantment(bel);
-		if (enchantment) {
-			Json::Value	enchantmentData;
-			enchantmentData["form"] = GetJCFormString(enchantment);
-			//enchantmentData["formID"] = (Json::UInt)enchantment->formID;
-			enchantmentData["name"] = enchantment->fullName.name.data;
-			Json::Value magicEffects;
-			for (int k = 0; k < enchantment->effectItemList.count; k++) {
-				MagicItem::EffectItem * effectItem;
-				enchantment->effectItemList.GetNthItem(k, effectItem);
-				if (effectItem) {
-					Json::Value effectItemData;
-					effectItemData["form"] = GetJCFormString(effectItem->mgef);
-					//effectItemData["formID"] = (Json::UInt)effectItem->mgef->formID;
-					effectItemData["name"] = effectItem->mgef->fullName.name.data;
-					effectItemData["area"] = (Json::UInt)effectItem->area;
-					effectItemData["magnitude"] = effectItem->magnitude;
-					effectItemData["duration"] = (Json::UInt)effectItem->duration;
-					magicEffects.append(effectItemData);
-				}
-			}
-			enchantmentData["magicEffects"] = magicEffects;
-			formExtraData["enchantment"] = enchantmentData;
-		}
-
-		if (!formExtraData.empty()) { //We don't want Count to be the only item in ExtraData
-			ExtraCount* xCount = static_cast<ExtraCount*>(bel->GetByType(kExtraData_Count));
-			if (xCount)
-				formExtraData["count"] = (Json::UInt)(xCount->count & 0xFFFF); //count returns UInt32 but value is UInt16, so strip the garbage
-		}
-
-		/*for (UInt32 i = 1; i < 0xB3; i++) {
-			if (bel->HasType(i))
-				_DMESSAGE("BaseExtraList has type: %0x", i);
-		}*/
-	}
+	Json::Value formExtraData;
+	if (bel)
+		formExtraData = _GetExtraDataJSON(form, bel);
 
 	if (!formExtraData.empty())
 		formData["extraData"] = formExtraData;
@@ -462,15 +506,9 @@ public:
 		ExtendDataList* edl = entryData->extendDataList;
 		if (edl) { 
 			Json::Value jExtendDataList;
-			for (int j = 0; j < edl->Count(); j++) {
-				BaseExtraList* bel = edl->GetNthItem(j);
-				TESForm * entryForm = entryData->type;
-				Json::Value jBaseExtraList = GetItemJSON(entryForm, entryData, bel);
-				if (!jBaseExtraList["extraData"].empty()) {
-					jBaseExtraList["writtenBy"] = "2";
-					jExtendDataList.append(jBaseExtraList);
-				}
-			}
+			ExtraListJsonFiller extraJsonFiller(thisForm);
+			edl->Visit(extraJsonFiller);
+			jExtendDataList = extraJsonFiller.GetJSON();
 			if (!jExtendDataList.empty()) {
 				jInventoryEntryData["extendDataList"] = jExtendDataList;
 			}
