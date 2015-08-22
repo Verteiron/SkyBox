@@ -204,21 +204,20 @@ std::string GetJCFormString(TESForm * form)
 	{
 		return NULL;
 	}
-	char static * modName = "";
+	const char * modName = nullptr;
 
 	UInt8 modIndex = form->formID >> 24;
-	if (modIndex <= 255)
+	if (modIndex < 255)
 	{
 		DataHandler* pDataHandler = DataHandler::GetSingleton();
 		ModInfo* modInfo = pDataHandler->modList.modInfoList.GetNthItem(modIndex);
-		modName = (modInfo) ? modInfo->name : "";
+		modName = (modInfo) ? modInfo->name : NULL;
 	}
-	
 
 	UInt32 modFormID = (modName) ? (form->formID & 0xFFFFFF) : form->formID;
 	
 	char returnStr[MAX_PATH];
-	sprintf_s(returnStr, "__formData|%s|0x%x", modName, modFormID);
+	sprintf_s(returnStr, "__formData|%s|0x%x", (modName) ? (modName) : "", modFormID);
 
 	return returnStr;
 
