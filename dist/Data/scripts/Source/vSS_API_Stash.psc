@@ -378,7 +378,7 @@ Int Function ScanContainer(ObjectReference akStashRef) Global
 		i += 1
 	EndWhile
 
-	Int jQuickContainerData = JValue.objectFromPrototype(SuperStash.GetJSONForContainer(akStashRef))
+	Int jQuickContainerData = JValue.objectFromPrototype(SuperStash.GetContainerJSON(akStashRef))
 	JValue.WriteToFile(jQuickContainerData,SuperStash.userDirectory() + "Stashes/quick.json")
 	i = JArray.Count(jQuickContainerData)
 	While i > 0

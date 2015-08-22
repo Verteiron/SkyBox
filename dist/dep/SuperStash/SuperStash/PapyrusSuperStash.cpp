@@ -245,7 +245,41 @@ SInt32 CalcItemId(TESForm * form, BaseExtraList * extraList)
 	return (SInt32)HashUtil::CRC32(name, form->formID & 0x00FFFFFF);
 }
 
-Json::Value _GetExtraDataJSON(TESForm* form, BaseExtraList* bel)
+Json::Value GetMagicItemJSON(MagicItem * pMagicItem)
+{
+	Json::Value jMagicItem;
+
+	if (!pMagicItem)
+		return jMagicItem;
+
+	jMagicItem["form"] = GetJCFormString(pMagicItem);
+
+	Json::Value jMagicEffects;
+
+	for (int i = 0; i < magicItemUtils::GetNumEffects(pMagicItem); i++) {
+		MagicItem::EffectItem * effectItem;
+		pMagicItem->effectItemList.GetNthItem(i, effectItem);
+		if (effectItem) {
+			Json::Value effectItemData;
+			effectItemData["form"] = GetJCFormString(effectItem->mgef);
+			//effectItemData["formID"] = (Json::UInt)effectItem->mgef->formID;
+			effectItemData["name"] = effectItem->mgef->fullName.name.data;
+			if (effectItem->area)
+				effectItemData["area"] = (Json::UInt)effectItem->area;
+			if (effectItem->magnitude)
+				effectItemData["magnitude"] = effectItem->magnitude;
+			if (effectItem->duration)
+				effectItemData["duration"] = (Json::UInt)effectItem->duration;
+			jMagicEffects.append(effectItemData);
+		}
+	}
+	if (!jMagicEffects.empty())
+		jMagicItem["magicEffects"] = jMagicEffects;
+
+	return jMagicItem;
+}
+
+Json::Value GetExtraDataJSON(TESForm* form, BaseExtraList* bel)
 {
 	Json::Value jBaseExtraList;
 	
@@ -288,26 +322,9 @@ Json::Value _GetExtraDataJSON(TESForm* form, BaseExtraList* bel)
 	EnchantmentItem * enchantment = referenceUtils::GetEnchantment(bel);
 	if (enchantment) {
 		Json::Value	enchantmentData;
-		enchantmentData["form"] = GetJCFormString(enchantment);
-		//enchantmentData["formID"] = (Json::UInt)enchantment->formID;
-		enchantmentData["name"] = enchantment->fullName.name.data;
-		Json::Value magicEffects;
-		for (int k = 0; k < enchantment->effectItemList.count; k++) {
-			MagicItem::EffectItem * effectItem;
-			enchantment->effectItemList.GetNthItem(k, effectItem);
-			if (effectItem) {
-				Json::Value effectItemData;
-				effectItemData["form"] = GetJCFormString(effectItem->mgef);
-				//effectItemData["formID"] = (Json::UInt)effectItem->mgef->formID;
-				effectItemData["name"] = effectItem->mgef->fullName.name.data;
-				effectItemData["area"] = (Json::UInt)effectItem->area;
-				effectItemData["magnitude"] = effectItem->magnitude;
-				effectItemData["duration"] = (Json::UInt)effectItem->duration;
-				magicEffects.append(effectItemData);
-			}
-		}
-		enchantmentData["magicEffects"] = magicEffects;
-		jBaseExtraList["enchantment"] = enchantmentData;
+		enchantmentData = GetMagicItemJSON(enchantment);
+		if (!enchantmentData.empty())
+			jBaseExtraList["enchantment"] = enchantmentData;
 	}
 
 	if (!jBaseExtraList.empty()) { //We don't want Count to be the only item in ExtraData
@@ -345,7 +362,7 @@ public:
 	bool Accept(BaseExtraList* bel)
 	{
 		if (IsWorthSaving(bel)) {
-			m_json.append(_GetExtraDataJSON(m_form, bel));
+			m_json.append(GetExtraDataJSON(m_form, bel));
 		}
 		return true;
 	}
@@ -377,31 +394,16 @@ Json::Value _GetItemJSON(TESForm * form, InventoryEntryData * entryData = NULL, 
 
 	//Get potion data for player-made potions
 	if (form->formType == AlchemyItem::kTypeID && IsPlayerPotion(form)) {
-		Json::Value	potionData;
 		AlchemyItem * pAlchemyItem = DYNAMIC_CAST(form, TESForm, AlchemyItem);
-		Json::Value magicEffects;
-		for (int i = 0; i < magicItemUtils::GetNumEffects(pAlchemyItem); i++) {
-			MagicItem::EffectItem * effectItem;
-			pAlchemyItem->effectItemList.GetNthItem(i, effectItem);
-			if (effectItem) {
-				Json::Value effectItemData;
-				effectItemData["form"] = GetJCFormString(effectItem->mgef);
-				//effectItemData["formID"] = (Json::UInt)effectItem->mgef->formID;
-				effectItemData["name"] = effectItem->mgef->fullName.name.data;
-				effectItemData["area"] = (Json::UInt)effectItem->area;
-				effectItemData["magnitude"] = effectItem->magnitude;
-				effectItemData["duration"] = (Json::UInt)effectItem->duration;
-				magicEffects.append(effectItemData);
-			}
-		}
-		potionData["magicEffects"] = magicEffects;
-		formData["potionData"] = potionData;
+		Json::Value	potionData = GetMagicItemJSON(pAlchemyItem);
+		if (!potionData.empty())
+			formData["potionData"] = potionData;
 	}
 
 	//If there is a BaseExtraList, get more info
 	Json::Value formExtraData;
 	if (bel)
-		formExtraData = _GetExtraDataJSON(form, bel);
+		formExtraData = GetExtraDataJSON(form, bel);
 
 	if (!formExtraData.empty())
 		formData["extraData"] = formExtraData;
@@ -851,7 +853,7 @@ namespace papyrusSuperStash
 		return (modInfo) ? modInfo->name : NULL;
 	}
 
-	BSFixedString GetJSONForObject(StaticFunctionTag*, TESObjectREFR* pObject)
+	BSFixedString GetObjectJSON(StaticFunctionTag*, TESObjectREFR* pObject)
 	{
 		TESForm * form = pObject->baseForm;
 		BaseExtraList * bel = &pObject->extraData;
@@ -866,7 +868,7 @@ namespace papyrusSuperStash
 		return jsonData.c_str();
 	}
 
-	BSFixedString GetJSONForContainer(StaticFunctionTag*, TESObjectREFR* pContainerRef)
+	BSFixedString GetContainerJSON(StaticFunctionTag*, TESObjectREFR* pContainerRef)
 	{
 		const char * result = NULL;
 
@@ -934,8 +936,8 @@ void papyrusSuperStash::RegisterFuncs(VMClassRegistry* registry)
 		new NativeFunction1<StaticFunctionTag, VMResultArray<BSFixedString>, VMArray<TESForm*>>("GetItemNames", "SuperStash", papyrusSuperStash::GetItemNames, registry));
 
 	registry->RegisterFunction(
-		new NativeFunction1<StaticFunctionTag, BSFixedString, TESObjectREFR*>("GetJSONForContainer", "SuperStash", papyrusSuperStash::GetJSONForContainer, registry));
+		new NativeFunction1<StaticFunctionTag, BSFixedString, TESObjectREFR*>("GetContainerJSON", "SuperStash", papyrusSuperStash::GetContainerJSON, registry));
 
 	registry->RegisterFunction(
-		new NativeFunction1<StaticFunctionTag, BSFixedString, TESObjectREFR*>("GetJSONForObject", "SuperStash", papyrusSuperStash::GetJSONForObject, registry));
+		new NativeFunction1<StaticFunctionTag, BSFixedString, TESObjectREFR*>("GetObjectJSON", "SuperStash", papyrusSuperStash::GetObjectJSON, registry));
 }

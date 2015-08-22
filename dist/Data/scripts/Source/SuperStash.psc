@@ -52,7 +52,10 @@ String[] Function GetItemNames(Form[] sourceArray) native global
 String Function GetSourceMod(Form akForm) native global
 {Returns the name of the mod that provides akForm.}
 
-String Function GetJSONForContainer(ObjectReference akContainerRef) native global
+String Function GetObjectJSON(ObjectReference akObjectRef) native global
+{Return a JContainer-compatible JSON for an ObjectReference.}
+
+String Function GetContainerJSON(ObjectReference akContainerRef) native global
 {Return a JContainer-compatible JSON for all the forms in akContainerRef.}
 
 ; Other useful functions

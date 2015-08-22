@@ -75,6 +75,12 @@
       <LinkTimeCodeGeneration />
       <ShowProgress>LinkVerboseLib</ShowProgress>
     </Link>
+    <PostBuildEvent>
+      <Command>xcopy /y "$(TargetPath)" "$(ProgramFiles)\Steam\steamapps\common\Skyrim\Data\SKSE\Plugins\$(TargetFileName)"</Command>
+    </PostBuildEvent>
+    <PostBuildEvent>
+      <Message>Copy to Skyrim directory</Message>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
@@ -97,6 +103,12 @@
       <SubSystem>Console</SubSystem>
       <ModuleDefinitionFile>exports.def</ModuleDefinitionFile>
     </Link>
+    <PostBuildEvent>
+      <Command>xcopy /y "$(TargetPath)" "$(ProgramFiles)\Steam\steamapps\common\Skyrim\Data\SKSE\Plugins\$(TargetFileName)"</Command>
+    </PostBuildEvent>
+    <PostBuildEvent>
+      <Message>Copy to Skyrim directory</Message>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
