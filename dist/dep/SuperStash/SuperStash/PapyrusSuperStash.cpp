@@ -9,6 +9,7 @@
 #include "skse/GameData.h"
 #include "skse/GameRTTI.h"
 #include "skse/GameExtraData.h"
+#include "skse/GameStreams.h"
 
 #include "skse/PapyrusObjectReference.h"
 #include "skse/PapyrusWornObject.h"
@@ -20,6 +21,8 @@
 #include <functional>
 #include <random>
 #include <algorithm>
+//#include <iostream>
+//#include <sstream>
 
 #include "PapyrusSuperStash.h"
 
@@ -78,7 +81,7 @@ std::string GetSSDirectory()
 	{
 		return std::string();
 	}
-	strcat_s(path, sizeof(path), "/My Games/Skyrim/SuperStash/");
+	strcat_s(path, sizeof(path), "\\My Games\\Skyrim\\SuperStash\\");
 	return path;
 }
 
@@ -172,25 +175,35 @@ bool IsObjectFavorited(TESForm * form)
 	}
 }
 
-bool SaveFile(const char * filePath) 
+bool LoadJsonFromFile(const char * filePath, Json::Value &jsonData)
 {
-
 	IFileStream		currentFile;
-	IFileStream::MakeAllDirs(filePath);
-	if (!currentFile.Create(filePath))
+	if (!currentFile.Open(filePath))
 	{
-		_ERROR("%s: couldn't create preset file (%s) Error (%d)", __FUNCTION__, filePath, GetLastError());
+		_ERROR("%s: couldn't open file (%s) Error (%d)", __FUNCTION__, filePath, GetLastError());
 		return true;
 	}
-	
 
+	char buf[512];
 
-	//std::string data = writer.write(root);
-
-	//currentFile.WriteBuf(data.c_str(), data.length());
+	std::string jsonString;
+	while (!currentFile.HitEOF()){
+		currentFile.ReadString(buf, sizeof(buf) / sizeof(buf[0]));
+		jsonString.append(buf);
+	}
 	currentFile.Close();
-	return false;
+	
+	Json::Features features;
+	features.all();
 
+	Json::Reader reader(features);
+
+	bool parseSuccess = reader.parse(jsonString, jsonData);
+	if (!parseSuccess) {
+		_ERROR("%s: Error occured parsing json for %s.", __FUNCTION__, filePath);
+		return true;
+	}
+	return false;
 }
 
 std::string GetJCFormString(TESForm * form)
@@ -220,7 +233,70 @@ std::string GetJCFormString(TESForm * form)
 	sprintf_s(returnStr, "__formData|%s|0x%x", (modName) ? (modName) : "", modFormID);
 
 	return returnStr;
+}
 
+TESForm* GetJCStringForm(std::string formString)
+{
+	TESForm * result = nullptr;
+
+	std::vector<std::string> stringData;
+
+	std::string formData("__formData");
+
+	std::string testString("__formData||0xff001953");
+
+	if (testString == formString)
+		_DMESSAGE("Do something!");
+
+	std::istringstream str(formString);
+	
+	std::string token;
+	while (std::getline(str, token, '|')) {
+		//std::cout << token << std::endl;
+		stringData.push_back(token);
+	}
+	
+	/*while (std::string::npos != pos || std::string::npos != lastPos)
+	{
+		std::string token = str.substr(lastPos, pos - lastPos); 
+		stringData.push_back(BSFixedString(token.c_str()));
+		lastPos = pos; //str.find_first_not_of(delimiters, pos);
+		pos = str.find_first_of(delimiters, lastPos);
+	}*/
+
+	if (stringData[0] != formData)
+		return result;
+
+	if (!stringData[2].length())
+		return result;
+
+	UInt8 modIndex = 0xff;
+
+	if (stringData[1].length()) {
+		DataHandler* pDataHandler = DataHandler::GetSingleton();
+		modIndex = pDataHandler->GetModIndex(stringData[1].c_str());
+	}
+	
+	if (modIndex == 0xff)
+		return result;
+
+	std::string formIdString(stringData[2].c_str());
+
+	UInt32 formId;
+
+	try {
+		formId = std::stoul(std::string(formIdString.begin(), formIdString.end()), nullptr, 0);
+	}
+	catch (const std::invalid_argument&) {
+		return result;
+	}
+	catch (const std::out_of_range&) {
+		return result;
+	}
+
+	formId |= modIndex << 24;
+	result = LookupFormByID(formId);
+	return result;
 }
 
 //Copied from papyrusactor.cpp since it's not in the header file
@@ -243,6 +319,37 @@ SInt32 CalcItemId(TESForm * form, BaseExtraList * extraList)
 		return 0;
 
 	return (SInt32)HashUtil::CRC32(name, form->formID & 0x00FFFFFF);
+}
+
+bool WriteItemData(TESForm* form, Json::Value jItemData)
+{
+	Json::StyledWriter writer;
+	std::string jsonString = writer.write(jItemData);
+	
+	if (!jsonString.length()) {
+		return true;
+	}
+
+	if (!jItemData["displayName"].isString()) {
+		return true;
+	}
+	
+	char filePath[MAX_PATH];
+	sprintf_s(filePath, "%s/Items/%08x_%s.json", GetSSDirectory().c_str(), form->formID, jItemData["displayName"].asCString());
+	
+
+	IFileStream	currentFile;
+	IFileStream::MakeAllDirs(filePath);
+	if (!currentFile.Create(filePath))
+	{
+		_ERROR("%s: couldn't create preset file (%s) Error (%d)", __FUNCTION__, filePath, GetLastError());
+		return true;
+	}
+
+	currentFile.WriteBuf(jsonString.c_str(), jsonString.length());
+	currentFile.Close();
+
+	return false;
 }
 
 Json::Value GetMagicItemJSON(MagicItem * pMagicItem)
@@ -291,7 +398,7 @@ Json::Value GetExtraDataJSON(TESForm* form, BaseExtraList* bel)
 
 	if (sDisplayName && (sDisplayName != pFullName->name.data)) {
 		jBaseExtraList["displayName"] = sDisplayName;
-		SInt32 itemID = CalcItemId(form, bel); //ItemID as used by WornObject and SkyUI, might be useful
+		UInt32 itemID = CalcItemId(form, bel); //ItemID as used by WornObject and SkyUI, might be useful
 		if (itemID)
 			jBaseExtraList["itemID"] = (Json::Int)itemID;
 	}
@@ -333,10 +440,17 @@ Json::Value GetExtraDataJSON(TESForm* form, BaseExtraList* bel)
 			jBaseExtraList["count"] = (Json::UInt)(xCount->count & 0xFFFF); //count returns UInt32 but value is UInt16, so strip the garbage
 	}
 
+	if (form->formType == TESObjectWEAP::kTypeID || form->formType == TESObjectARMO::kTypeID) {
+		Json::Value fileData = jBaseExtraList;
+		fileData["form"] = GetJCFormString(form);
+		WriteItemData(form, fileData);
+	}
+
 	/*for (UInt32 i = 1; i < 0xB3; i++) {
 	if (bel->HasType(i))
 	_DMESSAGE("BaseExtraList has type: %0x", i);
 	}*/
+
 	return jBaseExtraList;
 }
 
@@ -586,6 +700,78 @@ public:
 		return true;
 	}
 };
+
+SInt32 FillContainerFromJson(TESObjectREFR* pContainerRef, Json::Value jContainerData)
+{
+	SInt32 result = 0;
+
+	Json::Value jEntryDataList = jContainerData["entryDataList"];
+	if (jEntryDataList.empty() || jEntryDataList.type() != Json::arrayValue)
+		return result;
+
+	TESContainer* pContainer = NULL;
+	TESForm* pBaseForm = pContainerRef->baseForm;
+	if (pBaseForm)
+		pContainer = DYNAMIC_CAST(pBaseForm, TESForm, TESContainer);
+
+	if (!pContainer)
+		return result;
+		
+	ExtraContainerChanges* pXContainerChanges = static_cast<ExtraContainerChanges*>(pContainerRef->extraData.GetByType(kExtraData_ContainerChanges));
+	if (!pXContainerChanges) {
+		return result;
+	}
+	EntryDataList * entryList = pXContainerChanges ? pXContainerChanges->data->objList : NULL;
+
+	//entryList->RemoveAll();
+	for (auto & jEntryData : jEntryDataList) {
+		TESForm * thisForm = GetJCStringForm(jEntryData["form"].asString());
+		UInt32 count = jEntryData["count"].asInt();
+		if (thisForm && count) {
+			InventoryEntryData * newEntry = entryList->Find(thisForm);
+			InventoryEntryData * newEntry = InventoryEntryData::Create(thisForm, count);
+			Json::Value jExtendDataList = jEntryData["extendDataList"];
+			if (!jExtendDataList.empty() && jExtendDataList.type() == Json::arrayValue) {
+				ExtendDataList * edl = newEntry->extendDataList;
+				if (!edl) {
+					edl = ExtendDataList::Create();
+					newEntry->extendDataList = edl;
+				}
+				//newEntry->extendDataList->Dump();
+				/*int i = 0;
+				for (auto & jBaseExtraData : jExtendDataList) {
+					BaseExtraList * newBEL = edl->GetNthItem(i);
+					if (!newBEL) {
+						_DMESSAGE("No BEL!");
+						newBEL = (BaseExtraList *)FormHeap_Allocate(sizeof(BaseExtraList));
+						ASSERT(newBEL);
+						newBEL->m_presence = (BaseExtraList::PresenceBitfield *)FormHeap_Allocate(sizeof(BaseExtraList::PresenceBitfield));
+						ASSERT(newBEL->m_presence);
+						newBEL->m_data = (BSExtraData *)FormHeap_Allocate(sizeof(BSExtraData));
+						ASSERT(newBEL->m_data);
+					}
+					if (jBaseExtraData["displayName"].isString()) {
+						std::string displayName(jBaseExtraData["displayName"].asString());
+						referenceUtils::SetDisplayName(newBEL, displayName.c_str(),false);
+					}
+					if (newBEL->HasType(kExtraData_TextDisplayData)) {
+						edl->Push(newBEL);
+					}
+					else {
+						FormHeap_Free(newBEL->m_data);
+						FormHeap_Free(newBEL->m_presence);
+						FormHeap_Free(newBEL);
+					}
+					i++;
+				}*/
+			}
+			entryList->Push(newEntry);
+		}
+		//entryList->Dump();
+	}
+
+	return entryList->Count();
+}
 
 namespace papyrusSuperStash
 {
@@ -892,6 +1078,15 @@ namespace papyrusSuperStash
 
 		return containerJsonData.GetJsonString().c_str();
 	}
+
+	SInt32 FillContainerFromJSON(StaticFunctionTag*, TESObjectREFR* pContainerRef, BSFixedString filePath)
+	{
+		Json::Value jsonData;
+		LoadJsonFromFile(filePath.data, jsonData);
+		if (jsonData.empty())
+			return 0;
+		return FillContainerFromJson(pContainerRef, jsonData);
+	}
 }
 
 #include "skse/PapyrusVM.h"
@@ -940,4 +1135,8 @@ void papyrusSuperStash::RegisterFuncs(VMClassRegistry* registry)
 
 	registry->RegisterFunction(
 		new NativeFunction1<StaticFunctionTag, BSFixedString, TESObjectREFR*>("GetObjectJSON", "SuperStash", papyrusSuperStash::GetObjectJSON, registry));
+
+	registry->RegisterFunction(
+		new NativeFunction2<StaticFunctionTag, SInt32, TESObjectREFR*, BSFixedString>("FillContainerFromJSON", "SuperStash", papyrusSuperStash::FillContainerFromJSON, registry));
+	
 }

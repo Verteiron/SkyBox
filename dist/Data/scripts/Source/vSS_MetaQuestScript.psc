@@ -158,7 +158,7 @@ Function DoInit()
 	While StashManager.IsBusy
 		WaitMenuMode(0.5)
 	EndWhile
-	JValue.WriteToFile(JValue.objectFromPrototype(SuperStash.GetContainerJSON(Game.GetPlayer())),SuperStash.userDirectory() + "Stashes/player.json")
+	;JValue.WriteToFile(JValue.objectFromPrototype(SuperStash.GetContainerJSON(Game.GetPlayer())),SuperStash.userDirectory() + "Stashes/player.json")
 	DebugTrace("DoInit: Starting Compatibility modules...")
 	CheckCompatibilityModules()
 

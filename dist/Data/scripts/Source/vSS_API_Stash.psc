@@ -212,12 +212,82 @@ Int Function LoadStashesForCell(Cell akCell) Global
 		ObjectReference kContainer = akCell.GetNthRef(i,28)
 		If IsStash(kContainer)
 			DebugTraceAPIStash("Found Stash " + kContainer + "!")
-			Int iCount = ImportStashItems(kContainer)
+			
+			Int iCount = ImportStashItems_new(kContainer)
+			;String sFilePath = SuperStash.userDirectory() + "Stashes\\player.json"
+			
+			;Int iCount = SuperStash.FillContainerFromJSON(kContainer,sFilePath)
 			DebugTraceAPIStash("Imported " + iCount + " items for " + kContainer + ".")
 		EndIf
 		i += 1
 	EndWhile
 	Return i
+EndFunction
+
+Int Function ImportStashItems_new(ObjectReference akStashRef) Global
+	If !IsStash(akStashRef)
+		DebugTraceAPIStash("Error! " + akStashRef + " is not a valid Stash!")
+		Return 0
+	EndIf
+
+	vSS_StashManager StashManager 		= Quest.GetQuest("vSS_StashManagerQuest") as vSS_StashManager
+	ObjectReference kContainerTemp 		= StashManager.ContainerTemp
+	ObjectReference kMoveTarget 		= StashManager.MoveTarget
+	ObjectReference kContainerTarget 	= StashManager.ContainerTarget
+
+	String sStashID  = GetFormIDString(akStashRef)
+	String sFilePath = SuperStash.userDirectory() + "Stashes\\player.json"
+
+
+	;Create ExtraContainerChanges data for Container
+	Form kGold = Game.GetFormFromFile(0xf,"Skyrim.esm")
+	akStashRef.AddItem(kGold, 1, True)
+	akStashRef.RemoveItem(kGold, 1, True)
+	;This very quickly fills the container with all the base forms
+	SuperStash.FillContainerFromJson(akStashRef,sFilePath)
+
+	Int jContainerState 	= JValue.readFromFile(sFilePath)
+	Int jContainerEntries 	= JMap.GetObj(jContainerState,"containerEntries")
+	Int jEntryDataList 		= JMap.GetObj(jContainerState,"entryDataList")
+	JValue.AddToPool(jContainerState,"vSS_Stash_" + sStashID)
+	JValue.AddToPool(jContainerEntries,"vSS_Stash_" + sStashID)
+	JValue.AddToPool(jEntryDataList,"vSS_Stash_" + sStashID)
+	
+	Int iCustomCount = 0
+	Int i = JArray.Count(jEntryDataList)
+	While i > 0
+		i -= 1
+		Int jInventoryEntryData = JArray.GetObj(jEntryDataList,i)
+		If JValue.HasPath(jInventoryEntryData,".extendDataList")
+			Form kForm = JMap.GetForm(jInventoryEntryData,"form")
+			Int iCount = JMap.GetInt(jInventoryEntryData,"count")
+			If kForm && iCount
+				Int jExtendDataList = JMap.GetObj(jInventoryEntryData,"extendDataList")
+				If JValue.IsArray(jExtendDataList)
+					Int n = JArray.Count(jExtendDataList)
+					While n > 0
+						n -= 1
+						Int jBaseExtraData = JArray.GetObj(jExtendDataList,n)
+						;Int jObjectData = JValue.DeepCopy(jBaseExtraData)
+						;JMap.SetForm(jObjectData,"form",kForm)
+						
+						akStashRef.RemoveItem(kForm,1,True,kContainerTarget)
+						ObjectReference kObject = kContainerTarget.DropObject(kForm, 1)
+						If kObject
+							vSS_API_Item.CustomizeEquipmentFromJObj(jBaseExtraData,kObject)
+							kContainerTemp.AddItem(kObject)
+							DebugTraceAPIStash("Customized " + kObject + "!")
+							iCustomCount += 1
+						EndIf
+					EndWhile
+				EndIf
+				kContainerTemp.RemoveAllItems(akStashRef)
+			EndIf
+		EndIf
+	EndWhile
+
+	JValue.CleanPool("vSS_Stash_" + sStashID)
+	Return iCustomCount
 EndFunction
 
 Int Function ImportStashItems(ObjectReference akStashRef) Global
@@ -359,104 +429,15 @@ Int Function _CreateItemMap(ObjectReference akStashRef, ObjectReference akMoveTa
 	Return jItemMap
 EndFunction
 
+;For anyone reading this, I had this whole scan working perfectly in pure Papyrus. It was beautiful.
+;It was also mind-numbingly slow, even using multiple threads, so I learned c++ well enough to 
+;reimplement it in an SKSE plugin. Now it's nearly instantaneous. So it goes.
 Int Function ScanContainer(ObjectReference akStashRef) Global
 	DebugTraceAPIStash("=== Starting scan of " + akStashRef + " ===--")
 	vSS_StashManager StashManager = Quest.GetQuest("vSS_StashManagerQuest") as vSS_StashManager
-	ObjectReference 	kMoveTarget 		= StashManager.MoveTarget
-	ObjectReference 	kContainerTarget 	= StashManager.ContainerTarget
-	ObjectReference 	kContainerTemp 		= StashManager.ContainerTemp
-	vSS_WeaponScanner[] WeaponScanners		= StashManager.WeaponScanners
 
-	Int 		jContainerState	= JArray.Object()
-	JValue.AddToPool(jContainerState,"vSS_ScanState")
-
-	Int i = 0
-	Int iScannerCount = WeaponScanners.Length
-	While i < iScannerCount
-		WeaponScanners[i].Index = i
-		WeaponScanners[i].jContainerState = jContainerState
-		i += 1
-	EndWhile
-
-	Int jQuickContainerData = JValue.objectFromPrototype(SuperStash.GetContainerJSON(akStashRef))
-	JValue.WriteToFile(jQuickContainerData,SuperStash.userDirectory() + "Stashes/quick.json")
-	i = JArray.Count(jQuickContainerData)
-	While i > 0
-		i -= 1
-		DebugTraceAPIStash("Form for " + i + " is " + JMap.GetForm(JArray.GetObj(jQuickContainerData,i),"Form"))
-	EndWhile
-	;DebugTraceAPIStash("JSON for container is: " + SuperStash.GetJSONForContainer(akStashRef))
-
-	Form[] 		kStashItems 	= akStashRef.GetContainerForms()
-	Int[] 		iItemCount 		= SuperStash.GetItemCounts(kStashItems,akStashRef)
-	Int[] 		iItemTypes 		= SuperStash.GetItemTypes(kStashItems)
-	String[] 	sItemNames 		= SuperStash.GetItemNames(kStashItems)
-	;Int[] 		iItemExtraData 	= SuperStash.GetItemHasExtraData(kStashItems)
-
-	;Int i = kStashItems.Length
-	Float fStartWeight = akStashRef.GetTotalItemWeight()
-	Int iStartCount = akStashRef.GetNumItems()
-	i = iStartCount
-	DebugTraceAPIStash("Container's starting weight is " + akStashRef)
-
-	DebugTraceAPIStash("Scanning " + i + " forms in " + akStashRef + "...")
-	While i > 0
-		i -= 1
-		Bool bScannedElsewhere = False
-		Bool bItemUnchanged = False
-		String sItemID = ""
-
-		Form kItem = kStashItems[i]
-		Int iType = iItemTypes[i]
-		Int iCount = iItemCount[i]
-		; Bool bExtraData = iItemExtraData[i] as Bool
-		; Form kItem = akStashRef.GetNthForm(i)
-		; Int iType = kItem.GetType()
-		; Int iCount = akStashRef.GetItemCount(kItem)
-
-		Int jItemMap = 0
-
-		DebugTraceAPIStash("Scanning " + iCount + " of Form " + kItem + "...")
-
-		If kItem
-			If iCount > 0 
-				If kItem as ObjectReference || iType == 41 || iType == 26 ; Weapon or Armor
-					If kItem as ObjectReference
-						DebugTraceAPIStash(kItem + " is an ObjectReference!")
-						(kItem as ObjectReference).MoveTo(kMoveTarget)
-						sItemID = vSS_API_Item.SerializeObject(kItem as ObjectReference)
-						akStashRef.AddItem((kItem as ObjectReference),abSilent = True)
-					ElseIf iType == 41 || iType == 26 ; Weapon or Armor
-						DebugTraceAPIStash(kItem + " is a Weapon or Armor!")
-						akStashRef.RemoveItem(kItem,iCount,True,WeaponScanners[i % iScannerCount])
-						bScannedElsewhere = True
-						; ObjectReference kObject = kContainerTarget.DropObject(kItem, 1)
-						; sItemID = vSS_API_Item.GetObjectID(kObject)
-						; If !sItemID
-						; 	sItemID = vSS_API_Item.SerializeObject(kObject)
-						; EndIf
-						; akStashRef.AddItem(kObject,abSilent = True)
-					EndIf
-				EndIf
-				If !bScannedElsewhere
-					If sItemID
-						jItemMap = vSS_API_Item.GetItemJMap(sItemID)
-					Else
-						jItemMap = JMap.Object()
-						JMap.SetForm(jItemMap,"Form",kItem)
-						JMap.SetInt(jItemMap,"Count",iCount)
-					EndIf
-					JArray.AddObj(jContainerState,jItemMap)
-				EndIf
-			EndIf
-		EndIf
-	EndWhile
-	kContainerTarget.RemoveAllItems(akStashRef)
-	While akStashRef.GetNumItems() < iStartCount || akStashRef.GetTotalItemWeight() < fStartWeight || WeaponScanners[0].Busy || WeaponScanners[1].Busy || WeaponScanners[2].Busy || WeaponScanners[3].Busy
-		Utility.WaitMenuMode(0.5)
-		kContainerTarget.RemoveAllItems(akStashRef)
-		DebugTraceAPIStash("Waiting for weaponscanners, weight is " + akStashRef.GetTotalItemWeight() + "...")
-	EndWhile
+	Int jContainerState = JValue.objectFromPrototype(SuperStash.GetContainerJSON(akStashRef))
+	JValue.WriteToFile(jContainerState,SuperStash.userDirectory() + "Stashes/quick.json")
 	
 	DebugTraceAPIStash("=== Finished scan of " + akStashRef + " ===--")
 	Return jContainerState
@@ -570,7 +551,7 @@ Int Function ExportStashItems(ObjectReference akStashRef) Global
 	SetStashInt(akStashRef,"DataSerial",iDataSerial)
 	SetStashSessionInt(akStashRef,"DataSerial",iDataSerial)
 	
-	SetStashObj(akStashRef,"Items",jStashState)
+	SetStashObj(akStashRef,"ContainerState",jStashState)
 	SetStashStr(akStashRef,"LastSessionID",sSessionID)
 	SetStashFlt(akStashRef,"LastSessionTime",fSessionTime)
 

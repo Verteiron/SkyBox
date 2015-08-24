@@ -58,6 +58,9 @@ String Function GetObjectJSON(ObjectReference akObjectRef) native global
 String Function GetContainerJSON(ObjectReference akContainerRef) native global
 {Return a JContainer-compatible JSON for all the forms in akContainerRef.}
 
+Int Function FillContainerFromJSON(ObjectReference akContainerRef, String asJSON) native global
+{Fill akContainerRef with all the form data in asJSON. Returns number of entries processed.}
+
 ; Other useful functions
 
 String Function GetFormIDString(Form kForm) Global

@@ -344,48 +344,49 @@ ObjectReference Function CustomizeEquipmentFromJObj(Int ajItemInfo, ObjectRefere
 {Apply the customization information from ajItemInfo to akObject.}
 	ObjectReference kObject = akObject
 	Int jItem = ajItemInfo
-	Form kItem = JMap.getForm(jItem,"Form")
-	If !(kItem as Weapon) && !(kItem as Armor)
-		DebugTraceAPIItem("CustomizeEquipment: Item is not Weapon or Armor!",1)
-		Return kObject
-	EndIf
-	If JMap.getInt(jItem,"IsCustom")
-		String sDisplayName = JMap.getStr(jItem,"DisplayName")
-		;DebugTrace(kItem.GetName() + " is customized item " + sDisplayName + "!")
-		kObject.SetItemHealthPercent(JMap.getFlt(jItem,"ItemHealthPercent"))
-		;Debug.Trace("vSS/CM/" + sCharacterName + ":  WornObject.SetItemMaxCharge(kCharacterActor," + iHand + ",0," + JMap.getFlt(jItem,"ItemMaxCharge"))
-		kObject.SetItemMaxCharge(JMap.getFlt(jItem,"ItemMaxCharge"))
-		If sDisplayName ; Will be blank if player hasn't renamed the item
-			;Debug.Trace("vSS/CM/" + sCharacterName + ":  WornObject.SetDisplayName(kCharacterActor," + iHand + ",0," + sDisplayName)
-			kObject.SetDisplayName(sDisplayName)
-		EndIf
+	; Form kItem = JMap.getForm(jItem,"Form")
+	; If !(kItem as Weapon) && !(kItem as Armor)
+	; 	DebugTraceAPIItem("CustomizeEquipment: Item is not Weapon or Armor!",1)
+	; 	Return kObject
+	; EndIf
+	String sDisplayName = JMap.getStr(jItem,"displayName")
+	Float fHealth = JMap.getFlt(jItem,"health")
+	Float fItemCharge = JMap.getFlt(jItem,"itemCharge")
+	Float fItemMaxCharge = JMap.getFlt(jItem,"itemMaxCharge")
 
-		Float[] fMagnitudes = New Float[8]
-		Int[] iDurations = New Int[8]
-		Int[] iAreas = New Int[8]
-		MagicEffect[] kMagicEffects = New MagicEffect[8]
-		;Wait(1)
-		If JValue.solveInt(jItem,".Enchantment.IsCustom")
-			Int iNumEffects = JValue.solveInt(jItem,".Enchantment.NumEffects")
-			;Debug.Trace("vSS/CM/" + sCharacterName + ":  " + sDisplayName + " has a customized enchantment with " + inumEffects + " magiceffects!")
-			Int j = 0
-			Int jWeaponEnchEffects = JValue.SolveObj(jItem,".Enchantment.Effects")
-			While j < iNumEffects
-				Int jWeaponEnchEffect = JArray.getObj(jWeaponEnchEffects,j)
-				fMagnitudes[j] = JMap.GetFlt(jWeaponEnchEffect,"Magnitude")
-				iDurations[j] = JMap.GetFlt(jWeaponEnchEffect,"Duration") as Int
-				iAreas[j] = JMap.GetFlt(jWeaponEnchEffect,"Area") as Int
-				kMagicEffects[j] = JMap.GetForm(jWeaponEnchEffect,"MagicEffect") as MagicEffect
-				j += 1
-			EndWhile
-			;Debug.Trace("vSS/CM/" + sCharacterName + ":  " + sDisplayName + " creating custom enchantment...")
-			kObject.CreateEnchantment(JMap.getFlt(jItem,"ItemMaxCharge"), kMagicEffects, fMagnitudes, iAreas, iDurations)
-			kObject.SetItemCharge(JMap.getFlt(jItem,"ItemCharge"))
-			;Debug.Trace("vSS/CM/" + sCharacterName + ":  " + sDisplayName + " done!")
-		EndIf
-	Else
-		kObject.SetItemCharge(JMap.getFlt(jItem,"ItemCharge"))
+	If fHealth && fHealth > 1.0
+		kObject.SetItemHealthPercent(fHealth)
 	EndIf
+	If fItemMaxCharge
+		kObject.SetItemMaxCharge(fItemMaxCharge)
+	EndIf
+	If sDisplayName
+		kObject.SetDisplayName(sDisplayName)
+	EndIf
+
+	Float[] fMagnitudes = New Float[4]
+	Int[] iDurations = New Int[4]
+	Int[] iAreas = New Int[4]
+	MagicEffect[] kMagicEffects = New MagicEffect[4]
+
+	If JValue.HasPath(jItem,".enchantment")
+		Int jMagicEffects = JValue.SolveObj(jItem,".enchantment.magicEffects")
+		Int iNumEffects = JArray.Count(jMagicEffects)
+		Int j = 0
+		While j < iNumEffects
+			Int jMagicEffect = JArray.getObj(jMagicEffects,j)
+			fMagnitudes[j] = JMap.GetFlt(jMagicEffect,"magnitude")
+			iDurations[j] = JMap.GetInt(jMagicEffect,"duration")
+			iAreas[j] = JMap.GetFlt(jMagicEffect,"area") as Int
+			kMagicEffects[j] = JMap.GetForm(jMagicEffect,"form") as MagicEffect
+			j += 1
+		EndWhile
+		kObject.CreateEnchantment(fItemMaxCharge, kMagicEffects, fMagnitudes, iAreas, iDurations)
+		kObject.SetItemCharge(fItemCharge)
+	ElseIf fItemCharge
+		kObject.SetItemCharge(fItemCharge)
+	EndIf
+
 	Return kObject
 EndFunction
 
