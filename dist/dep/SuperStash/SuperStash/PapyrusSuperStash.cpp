@@ -9,9 +9,9 @@
 #include "skse/GameData.h"
 #include "skse/GameRTTI.h"
 #include "skse/GameExtraData.h"
-#include "skse/GameStreams.h"
+//#include "skse/GameStreams.h"
 
-#include "skse/PapyrusObjectReference.h"
+//#include "skse/PapyrusObjectReference.h"
 #include "skse/PapyrusWornObject.h"
 #include "skse/PapyrusSpell.h"
 
@@ -61,6 +61,166 @@ void VisitFormList(BGSListForm * formList, std::function<void(TESForm*)> functor
 		}
 	}
 }
+
+//Copied from referenceUtils::CreateEnchantment, modified to accept non-VM arrays
+void CreateEnchantmentFromVectors(TESForm* baseForm, BaseExtraList * extraData, float maxCharge, std::vector<EffectSetting*> effects, std::vector<float> magnitudes, std::vector<UInt32> areas, std::vector<UInt32> durations)
+{
+	if (baseForm && (baseForm->formType == TESObjectWEAP::kTypeID || baseForm->formType == TESObjectARMO::kTypeID)) {
+		EnchantmentItem * enchantment = NULL;
+		if (effects.size() > 0 && magnitudes.size() == effects.size() && areas.size() == effects.size() && durations.size() == effects.size()) {
+			tArray<MagicItem::EffectItem> effectItems;
+			effectItems.Allocate(effects.size());
+
+			UInt32 j = 0;
+			for (UInt32 i = 0; i < effects.size(); i++) {
+				EffectSetting * magicEffect = effects[i];
+				if (magicEffect) { // Only add effects that actually exist
+					effectItems[j].magnitude = magnitudes[i];
+					effectItems[j].area = areas[i];
+					effectItems[j].duration = durations[i];
+					effectItems[j].mgef = magicEffect;
+					j++;
+				}
+			}
+			effectItems.count = j; // Set count to existing count
+
+			if (baseForm->formType == TESObjectWEAP::kTypeID)
+				enchantment = CALL_MEMBER_FN(PersistentFormManager::GetSingleton(), CreateOffensiveEnchantment)(&effectItems);
+			else
+				enchantment = CALL_MEMBER_FN(PersistentFormManager::GetSingleton(), CreateDefensiveEnchantment)(&effectItems);
+
+			FormHeap_Free(effectItems.arr.entries);
+		}
+
+		if (enchantment) {
+			if (maxCharge > 0xFFFF) // Charge exceeds uint16 clip it
+				maxCharge = 0xFFFF;
+
+			ExtraEnchantment* extraEnchant = static_cast<ExtraEnchantment*>(extraData->GetByType(kExtraData_Enchantment));
+			if (extraEnchant) {
+				PersistentFormManager::GetSingleton()->DecRefEnchantment(extraEnchant->enchant);
+				extraEnchant->enchant = enchantment;
+				PersistentFormManager::GetSingleton()->IncRefEnchantment(extraEnchant->enchant);
+
+				extraEnchant->maxCharge = (UInt16)maxCharge;
+			}
+			else {
+				ExtraEnchantment* extraEnchant = ExtraEnchantment::Create();
+				extraEnchant->enchant = enchantment;
+				extraEnchant->maxCharge = (UInt16)maxCharge;
+				extraData->Add(kExtraData_Enchantment, extraEnchant);
+			}
+		}
+	}
+}
+
+AlchemyItem* _CreateCustomPotionFromVector(std::vector<EffectSetting*> effects, std::vector<float> magnitudes, std::vector<UInt32> areas, std::vector<UInt32> durations, SInt32 forceType = 0)
+{
+	AlchemyItem * potion = nullptr;
+
+	bool isPoison = false;
+
+	if (effects.size() > 0 && magnitudes.size() == effects.size() && areas.size() == effects.size() && durations.size() == effects.size()) {
+		tArray<MagicItem::EffectItem> effectItems;
+		effectItems.Allocate(effects.size());
+
+		UInt32 j = 0;
+		for (UInt32 i = 0; i < effects.size(); i++) {
+			EffectSetting * magicEffect = effects[i];
+			if (magicEffect) { // Only add effects that actually exist
+				effectItems[j].magnitude = magnitudes[i];
+				effectItems[j].area = areas[i];
+				effectItems[j].duration = durations[i];
+				effectItems[j].mgef = magicEffect;
+				j++;
+			}
+		}
+		effectItems.count = j; // Set count to existing count
+
+		//Has user forced the poison setting?
+		if (forceType == 1) {
+			isPoison = false;
+		}
+		else if (forceType == 2) {
+			isPoison = true;
+		}
+		else {
+			//Auto-determine if it's poison
+			UInt32 archetype = effectItems[0].mgef->properties.archetype;
+			UInt32 isDetrimental = (effectItems[0].mgef->properties.flags & EffectSetting::Properties::kEffectType_Detrimental) != 0;
+
+			switch (archetype)
+			{
+			case EffectSetting::Properties::kArchetype_ValueMod:
+			case EffectSetting::Properties::kArchetype_DualValueMod:
+			case EffectSetting::Properties::kArchetype_PeakValueMod:
+			{
+				isPoison = isDetrimental ? true : false;
+				break;
+			}
+			case EffectSetting::Properties::kArchetype_Absorb:
+			case EffectSetting::Properties::kArchetype_CureDisease:
+			case EffectSetting::Properties::kArchetype_Invisibility:
+			case EffectSetting::Properties::kArchetype_CureParalysis:
+			case EffectSetting::Properties::kArchetype_CureAddiction:
+			case EffectSetting::Properties::kArchetype_CurePoison:
+			case EffectSetting::Properties::kArchetype_Dispel:
+			{
+				isPoison = false;
+				break;
+			}
+			case EffectSetting::Properties::kArchetype_Frenzy:
+			case EffectSetting::Properties::kArchetype_Calm:
+			case EffectSetting::Properties::kArchetype_Demoralize:
+			case EffectSetting::Properties::kArchetype_Paralysis:
+			{
+				isPoison = true;
+				break;
+			}
+			}
+		}
+		if (isPoison) {
+			CALL_MEMBER_FN(PersistentFormManager::GetSingleton(), CreatePoison)(&potion, &effectItems);
+		}
+		else {
+			CALL_MEMBER_FN(PersistentFormManager::GetSingleton(), CreatePotion)(&potion, &effectItems);
+		}
+
+		FormHeap_Free(effectItems.arr.entries);
+	}
+
+	return (AlchemyItem*)potion;
+}
+
+AlchemyItem* _CreateCustomPotion(VMArray<EffectSetting*> effects, VMArray<float> magnitudes, VMArray<UInt32> areas, VMArray<UInt32> durations, SInt32 forceType = 0)
+{
+	AlchemyItem * potion = nullptr;
+
+	std::vector<EffectSetting*> effects_v;
+	std::vector<float> magnitudes_v;
+	std::vector<UInt32> areas_v;
+	std::vector<UInt32> durations_v;
+
+	for (UInt32 i = 0; i < effects.Length(); i++) {
+		float magnitude = 0;
+		UInt32 area = 0;
+		UInt32 duration = 0;
+		EffectSetting * magicEffect = NULL;
+		effects.Get(&magicEffect, i);
+		if (magicEffect) { // Only add effects that actually exist
+			magnitudes.Get(&magnitude, i);
+			areas.Get(&area, i);
+			durations.Get(&duration, i);
+			effects_v.push_back(magicEffect);
+			magnitudes_v.push_back(magnitude);
+			areas_v.push_back(area);
+			durations_v.push_back(duration);
+		}
+	}
+
+	return _CreateCustomPotionFromVector(effects_v, magnitudes_v, areas_v, durations_v, forceType);
+}
+
 
 bool isReadable(const std::string& name) {
 	FILE *file;
@@ -420,9 +580,9 @@ Json::Value GetExtraDataJSON(TESForm* form, BaseExtraList* bel)
 		ExtraSoul * xSoul = static_cast<ExtraSoul*>(bel->GetByType(kExtraData_Soul));
 		if (xSoul) {
 			//count returns UInt32 but value is UInt8, so strip the garbage
-			UInt16 soulCount = xSoul->count & 0xFF;
+			UInt8 soulCount = xSoul->count & 0xFF;
 			if (soulCount)
-				jBaseExtraList["soulSize"] = (Json::UInt)(xSoul->count & 0xFF);
+				jBaseExtraList["soulSize"] = (Json::UInt)(soulCount);
 		}
 	}
 
@@ -510,8 +670,10 @@ Json::Value _GetItemJSON(TESForm * form, InventoryEntryData * entryData = NULL, 
 	if (form->formType == AlchemyItem::kTypeID && IsPlayerPotion(form)) {
 		AlchemyItem * pAlchemyItem = DYNAMIC_CAST(form, TESForm, AlchemyItem);
 		Json::Value	potionData = GetMagicItemJSON(pAlchemyItem);
-		if (!potionData.empty())
+		if (!potionData.empty()) {
+			potionData["isPoison"] = pAlchemyItem->IsPoison();
 			formData["potionData"] = potionData;
+		}
 	}
 
 	//If there is a BaseExtraList, get more info
@@ -701,6 +863,21 @@ public:
 	}
 };
 
+class EntryFormFinder
+{
+	TESForm* m_form;
+public:
+	EntryFormFinder(TESForm* a_form) : m_form(a_form) {}
+
+	bool Accept(InventoryEntryData* pEntry)
+	{
+		if (pEntry->type == m_form) {
+			return true;
+		}
+		return false;
+	}
+};
+
 SInt32 FillContainerFromJson(TESObjectREFR* pContainerRef, Json::Value jContainerData)
 {
 	SInt32 result = 0;
@@ -723,51 +900,129 @@ SInt32 FillContainerFromJson(TESObjectREFR* pContainerRef, Json::Value jContaine
 	}
 	EntryDataList * entryList = pXContainerChanges ? pXContainerChanges->data->objList : NULL;
 
-	//entryList->RemoveAll();
 	for (auto & jEntryData : jEntryDataList) {
 		TESForm * thisForm = GetJCStringForm(jEntryData["form"].asString());
+		if (!thisForm) {
+			Json::Value jPotionData = jEntryData["potionData"];
+			if (!jPotionData.empty()) {
+				std::vector<EffectSetting*> effects;
+				std::vector<UInt32> durations;
+				std::vector<float> magnitudes;
+				std::vector<UInt32> areas;
+
+				int effectNum = 0;
+				for (auto & jMagicEffect : jPotionData["magicEffects"]) {
+					EffectSetting* effect = DYNAMIC_CAST(GetJCStringForm(jMagicEffect["form"].asString()), TESForm, EffectSetting);
+					effects.push_back(effect);
+					durations.push_back((UInt32)jMagicEffect["duration"].asInt());
+					areas.push_back((UInt32)jMagicEffect["area"].asInt());
+					magnitudes.push_back((float)jMagicEffect["magnitude"].asFloat());
+					effectNum++;
+				}
+				AlchemyItem* thisPotion = _CreateCustomPotionFromVector(effects, magnitudes, areas, durations);
+				if (thisPotion)
+					thisForm = thisPotion;
+			}
+		}
 		UInt32 count = jEntryData["count"].asInt();
 		if (thisForm && count) {
-			InventoryEntryData * newEntry = entryList->Find(thisForm);
-			InventoryEntryData * newEntry = InventoryEntryData::Create(thisForm, count);
+			InventoryEntryData * thisEntry = pXContainerChanges->data->FindItemEntry(thisForm);
+			if (thisEntry) {
+				thisEntry->countDelta = count - pContainer->CountItem(thisForm);
+			}
+			else {
+				thisEntry = InventoryEntryData::Create(thisForm, count);
+				entryList->Push(thisEntry);
+			}
+
 			Json::Value jExtendDataList = jEntryData["extendDataList"];
 			if (!jExtendDataList.empty() && jExtendDataList.type() == Json::arrayValue) {
-				ExtendDataList * edl = newEntry->extendDataList;
+				ExtendDataList * edl = thisEntry->extendDataList;
 				if (!edl) {
 					edl = ExtendDataList::Create();
-					newEntry->extendDataList = edl;
+					thisEntry->extendDataList = edl;
 				}
+				//** Can't repopulate BELs until we figure out a way to create them from scratch
 				//newEntry->extendDataList->Dump();
-				/*int i = 0;
+				int i = 0;
 				for (auto & jBaseExtraData : jExtendDataList) {
-					BaseExtraList * newBEL = edl->GetNthItem(i);
+					BaseExtraList * newBEL = thisEntry->extendDataList->GetNthItem(i);
 					if (!newBEL) {
-						_DMESSAGE("No BEL!");
 						newBEL = (BaseExtraList *)FormHeap_Allocate(sizeof(BaseExtraList));
 						ASSERT(newBEL);
-						newBEL->m_presence = (BaseExtraList::PresenceBitfield *)FormHeap_Allocate(sizeof(BaseExtraList::PresenceBitfield));
+						newBEL->m_data = NULL;
+						newBEL->m_presence = (BaseExtraList::PresenceBitfield*)FormHeap_Allocate(sizeof(BaseExtraList::PresenceBitfield));
 						ASSERT(newBEL->m_presence);
-						newBEL->m_data = (BSExtraData *)FormHeap_Allocate(sizeof(BSExtraData));
-						ASSERT(newBEL->m_data);
+						std::fill(newBEL->m_presence->bits, newBEL->m_presence->bits + 0x18, 0);
 					}
 					if (jBaseExtraData["displayName"].isString()) {
 						std::string displayName(jBaseExtraData["displayName"].asString());
 						referenceUtils::SetDisplayName(newBEL, displayName.c_str(),false);
 					}
-					if (newBEL->HasType(kExtraData_TextDisplayData)) {
+					if (jBaseExtraData["enchantment"].isObject()) {
+						float maxCharge = jBaseExtraData["itemMaxCharge"].asFloat();
+						
+						std::vector<EffectSetting*> effects;
+						std::vector<UInt32> durations;
+						std::vector<float> magnitudes;
+						std::vector<UInt32> areas;
+						
+						int effectNum = 0;
+						for (auto & jMagicEffect : jBaseExtraData["enchantment"]["magicEffects"]) {
+							EffectSetting* effect = DYNAMIC_CAST(GetJCStringForm(jMagicEffect["form"].asString()), TESForm, EffectSetting);
+							effects.push_back(effect);
+							durations.push_back((UInt32)jMagicEffect["duration"].asInt());
+							areas.push_back((UInt32)jMagicEffect["area"].asInt());
+							magnitudes.push_back((float)jMagicEffect["magnitude"].asFloat());
+							effectNum++;
+						}
+						CreateEnchantmentFromVectors(thisForm, newBEL, maxCharge, effects, magnitudes, areas, durations);
+					}
+					if (jBaseExtraData["itemCharge"].isNumeric())
+						referenceUtils::SetItemCharge(thisForm, newBEL, jBaseExtraData["itemCharge"].asFloat());
+					
+					if (jBaseExtraData["health"].isNumeric())
+						referenceUtils::SetItemHealthPercent(thisForm, newBEL, jBaseExtraData["health"].asFloat());
+											
+					if (jBaseExtraData["soulSize"].isInt()) {
+						UInt8 soulLevel = jBaseExtraData["soulSize"].asInt();
+						ExtraSoul * extraSoul = static_cast<ExtraSoul*>(newBEL->GetByType(kExtraData_Soul));
+						if (extraSoul) {
+							extraSoul->count = soulLevel;
+						}
+						else {
+							extraSoul = ExtraSoul::Create();
+							extraSoul->count = (UInt8)soulLevel;
+							newBEL->Add(kExtraData_Soul, extraSoul);
+						}
+					}
+
+					if (jBaseExtraData["count"].isInt()) {
+						UInt32 thisCount = jBaseExtraData["count"].asInt();
+						ExtraCount * extraCount = static_cast<ExtraCount*>(newBEL->GetByType(kExtraData_Count));
+						if (extraCount) {
+							extraCount->count = thisCount;
+						}
+						else {
+							extraCount = ExtraCount::Create();
+							extraCount->count = (UInt8)thisCount;
+							newBEL->Add(kExtraData_Count, extraCount);
+						}
+					}
+					
+					if (newBEL->m_data) {
 						edl->Push(newBEL);
 					}
 					else {
-						FormHeap_Free(newBEL->m_data);
+						//FormHeap_Free(newBEL->m_data);
 						FormHeap_Free(newBEL->m_presence);
 						FormHeap_Free(newBEL);
 					}
 					i++;
-				}*/
+				}
 			}
-			entryList->Push(newEntry);
 		}
-		//entryList->Dump();
+		entryList->Dump();
 	}
 
 	return entryList->Count();
@@ -1087,6 +1342,43 @@ namespace papyrusSuperStash
 			return 0;
 		return FillContainerFromJson(pContainerRef, jsonData);
 	}
+
+	AlchemyItem* CreateCustomPotion(StaticFunctionTag*, VMArray<EffectSetting*> effects, VMArray<float> magnitudes, VMArray<UInt32> areas, VMArray<UInt32> durations, SInt32 forcePotionType)
+	{
+		return _CreateCustomPotion(effects, magnitudes, areas, durations, forcePotionType);
+	}
+
+	/* This won't work. :( Soulgems do not retain their ExtraSoul data outside of containers, period.
+
+	TESObjectREFR* FillSoulGem(StaticFunctionTag*, TESObjectREFR* object, SInt32 level)
+	{
+		TESSoulGem* soulgemBase = DYNAMIC_CAST(object->baseForm, TESForm, TESSoulGem);
+		if (!soulgemBase)
+			return object;
+
+		BaseExtraList * bel = &object->extraData;
+
+		for (int i = 0x01; i < 0xb3; i++) {
+			if (bel->HasType(i))
+				_DMESSAGE("Soulgem has BEL of type 0x%02x", i);
+		}
+
+		if (level && (level > 0 && level < 6)) {
+			ExtraSoul * extraSoul = static_cast<ExtraSoul*>(bel->GetByType(kExtraData_Soul));
+			if (extraSoul) {
+				extraSoul->count = level;
+			}
+			else {
+				extraSoul = ExtraSoul::Create();
+				extraSoul->count = (UInt8)level;
+				bel->Add(kExtraData_Soul, extraSoul);
+			}
+			_DMESSAGE("ExtraSoul->Count is now %d!", extraSoul->count);
+		}
+		return object;
+	}
+
+	*/
 }
 
 #include "skse/PapyrusVM.h"
@@ -1139,4 +1431,10 @@ void papyrusSuperStash::RegisterFuncs(VMClassRegistry* registry)
 	registry->RegisterFunction(
 		new NativeFunction2<StaticFunctionTag, SInt32, TESObjectREFR*, BSFixedString>("FillContainerFromJSON", "SuperStash", papyrusSuperStash::FillContainerFromJSON, registry));
 	
+	registry->RegisterFunction(
+		new NativeFunction5<StaticFunctionTag, AlchemyItem*, VMArray<EffectSetting*>, VMArray<float>, VMArray<UInt32>, VMArray<UInt32>, SInt32>("CreateCustomPotion", "SuperStash", papyrusSuperStash::CreateCustomPotion, registry));
+
+	/*registry->RegisterFunction(
+		new NativeFunction2<StaticFunctionTag, TESObjectREFR*, TESObjectREFR*, SInt32>("FillSoulGem", "SuperStash", papyrusSuperStash::FillSoulGem, registry));*/
+		
 }

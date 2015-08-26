@@ -244,7 +244,7 @@ Int Function ImportStashItems_new(ObjectReference akStashRef) Global
 	akStashRef.AddItem(kGold, 1, True)
 	akStashRef.RemoveItem(kGold, 1, True)
 	;This very quickly fills the container with all the base forms
-	SuperStash.FillContainerFromJson(akStashRef,sFilePath)
+	return SuperStash.FillContainerFromJson(akStashRef,sFilePath)
 
 	Int jContainerState 	= JValue.readFromFile(sFilePath)
 	Int jContainerEntries 	= JMap.GetObj(jContainerState,"containerEntries")
@@ -274,14 +274,29 @@ Int Function ImportStashItems_new(ObjectReference akStashRef) Global
 						akStashRef.RemoveItem(kForm,1,True,kContainerTarget)
 						ObjectReference kObject = kContainerTarget.DropObject(kForm, 1)
 						If kObject
-							vSS_API_Item.CustomizeEquipmentFromJObj(jBaseExtraData,kObject)
-							kContainerTemp.AddItem(kObject)
-							DebugTraceAPIStash("Customized " + kObject + "!")
-							iCustomCount += 1
+							Int x = 1
+							If JMap.HasKey(jBaseExtraData,"count")
+								x = JMap.GetInt(jBaseExtraData,"count")
+							EndIf
+							While x > 0
+								x -= 1
+								vSS_API_Item.CustomizeObjectFromJObj(jBaseExtraData,kObject)
+								kContainerTemp.AddItem(kObject)
+								;DebugTraceAPIStash("Customized " + kObject + " (" + kObject.GetDisplayName() + ")!")
+								iCustomCount += 1
+							EndWhile
 						EndIf
 					EndWhile
 				EndIf
 				kContainerTemp.RemoveAllItems(akStashRef)
+			EndIf
+		ElseIf JValue.HasPath(jInventoryEntryData,".potionData")
+			Int iCount = JMap.GetInt(jInventoryEntryData,"count")
+			Int jPotionData = JValue.SolveObj(jInventoryEntryData,".potionData")
+			Potion kPotion = vSS_API_Item.CreatePotionFromPotionData(jPotionData)
+			;DebugTraceAPIStash("Potion created from PotionData is " + kPotion + " (" + kPotion.GetName() + ")!")
+			If kPotion
+				akStashRef.AddItem(kPotion,iCount,True)
 			EndIf
 		EndIf
 	EndWhile

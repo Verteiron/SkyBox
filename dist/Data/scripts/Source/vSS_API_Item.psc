@@ -340,8 +340,31 @@ ObjectReference Function CustomizeEquipment(String asItemID, ObjectReference akO
 	Return kObject
 EndFunction
 
-ObjectReference Function CustomizeEquipmentFromJObj(Int ajItemInfo, ObjectReference akObject) Global
+ObjectReference Function CustomizeObjectFromJObj(Int ajItemInfo, ObjectReference akObject) Global
 {Apply the customization information from ajItemInfo to akObject.}
+	ObjectReference kObject = akObject
+	Int jItem = ajItemInfo
+
+	Form kBaseObject = kObject.GetBaseObject()
+	If (kBaseObject as Weapon) || (kBaseObject as Armor)
+		Return CustomizeEquipmentFromJObj(jItem,kObject)
+	
+	; Soulgem stuff no worky.
+	; ElseIf (kBaseObject as SoulGem)
+	; 	Int iSoulLevel = JMap.getInt(jItem,"soulSize")
+	; 	If iSoulLevel
+	; 		DebugTraceAPIItem("Filling soulgem " + kObject + " with level " + iSoulLevel + " soul...")
+	; 		Return SuperStash.FillSoulgem(kObject,iSoulLevel)
+	; 		;Return kObject
+	; 	EndIf
+	EndIf
+
+	Return kObject
+
+EndFunction
+
+ObjectReference Function CustomizeEquipmentFromJObj(Int ajItemInfo, ObjectReference akObject) Global
+{Apply the customization information from ajItemInfo to weapon or armor akObject.}
 	ObjectReference kObject = akObject
 	Int jItem = ajItemInfo
 	; Form kItem = JMap.getForm(jItem,"Form")
@@ -350,6 +373,7 @@ ObjectReference Function CustomizeEquipmentFromJObj(Int ajItemInfo, ObjectRefere
 	; 	Return kObject
 	; EndIf
 	String sDisplayName = JMap.getStr(jItem,"displayName")
+	sDisplayName = StringUtil.SubString(sDisplayName,0,StringUtil.Find(sDisplayName,"(") - 1) ; Strip " (Legendary)"
 	Float fHealth = JMap.getFlt(jItem,"health")
 	Float fItemCharge = JMap.getFlt(jItem,"itemCharge")
 	Float fItemMaxCharge = JMap.getFlt(jItem,"itemMaxCharge")
@@ -430,6 +454,33 @@ String Function SerializePotion(Form akItem) Global
 	JMap.SetObj(jPotionInfo,"Effects",jEffectsArray)
 	;Debug.Trace("vSS/CM: Finished serializing " + akItem.GetName() + ", JMap count is " + JMap.Count(jPotionInfo))
 	Return vSS_API_Item.SaveItem(jPotionInfo)
+EndFunction
+
+Potion Function CreatePotionFromPotionData(Int jPotionData) Global
+{Create a custom potion using jPotionData.}
+
+	Float[] fMagnitudes = New Float[4]
+	Int[] iDurations = New Int[4]
+	Int[] iAreas = New Int[4]
+	MagicEffect[] kMagicEffects = New MagicEffect[4]
+
+	Int iForcePotionType = 0
+	If JValue.HasPath(jPotionData,".isPoison")
+		iForcePotionType = JValue.SolveInt(jPotionData,".isPoison")
+	EndIf
+
+	Int jMagicEffects = JValue.SolveObj(jPotionData,".magicEffects")
+	Int iNumEffects = JArray.Count(jMagicEffects)
+	Int i = 0
+	While i < iNumEffects
+		Int jMagicEffect = JArray.getObj(jMagicEffects,i)
+		fMagnitudes[i] = JMap.GetFlt(jMagicEffect,"magnitude")
+		iDurations[i] = JMap.GetInt(jMagicEffect,"duration")
+		iAreas[i] = JMap.GetFlt(jMagicEffect,"area") as Int
+		kMagicEffects[i] = JMap.GetForm(jMagicEffect,"form") as MagicEffect
+		i += 1
+	EndWhile
+	Return SuperStash.CreateCustomPotion(kMagicEffects, fMagnitudes, iAreas, iDurations, iForcePotionType)
 EndFunction
 
 ObjectReference Function CreatePotion(String asItemID) Global

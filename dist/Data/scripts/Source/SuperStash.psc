@@ -61,6 +61,14 @@ String Function GetContainerJSON(ObjectReference akContainerRef) native global
 Int Function FillContainerFromJSON(ObjectReference akContainerRef, String asJSON) native global
 {Fill akContainerRef with all the form data in asJSON. Returns number of entries processed.}
 
+Potion Function CreateCustomPotion(MagicEffect[] effects, float[] magnitudes, int[] areas, int[] durations, Int aiForcePotionType = 0) native global
+{Create a new custom potion with the specified magic effects. 
+ Set aiForcePotionType to 1 to force a Potion, 2 to force a Poison. 0 auto-detects.}
+
+;Sadly, FillSoulGem won't work on ObjectReferences because Soulgem objects lose their ExtraSoul BELs. Sucks :()
+;ObjectReference Function FillSoulgem(ObjectReference akSoulgemRef, Int aiSoulLevel) native global
+;{Fill the soulgem in akSoulgemRef with the level of soul specified by aiSoulLevel. Returns original object.}
+
 ; Other useful functions
 
 String Function GetFormIDString(Form kForm) Global
