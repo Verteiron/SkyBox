@@ -957,7 +957,13 @@ SInt32 FillContainerFromJson(TESObjectREFR* pContainerRef, Json::Value jContaine
 					}
 					if (jBaseExtraData["displayName"].isString()) {
 						std::string displayName(jBaseExtraData["displayName"].asString());
-						referenceUtils::SetDisplayName(newBEL, displayName.c_str(),false);
+						std::istringstream str(displayName);
+						std::vector<std::string> stringData;
+						std::string token;
+						while (std::getline(str, token, '(')) {
+							stringData.push_back(token);
+						}
+						referenceUtils::SetDisplayName(newBEL, stringData[0].substr(0, stringData[0].length() - 1).c_str(), false);
 					}
 					if (jBaseExtraData["enchantment"].isObject()) {
 						float maxCharge = jBaseExtraData["itemMaxCharge"].asFloat();
