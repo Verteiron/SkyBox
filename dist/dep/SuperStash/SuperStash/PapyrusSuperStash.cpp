@@ -34,6 +34,19 @@
 
 typedef std::vector<TESForm*> FormVec;
 
+SInt32(*JArray_size)(void*, SInt32 obj) = nullptr;
+TESForm* (*JArray_getForm)(void*, SInt32 obj, SInt32 idx, TESForm* def) = nullptr;
+SInt32(*JValue_objectFromPrototype)(void*, const char *prototype) = nullptr;
+SInt32(*JValue_release)(void*, SInt32 obj) = nullptr;
+
+
+template<class T>
+void obtain_func(const jc::reflection_interface *refl, const char *funcName, const char *className, T& func) {
+	assert(refl);
+	func = (T)refl->tes_function_of_class(funcName, className);
+	assert(func);
+}
+
 //Temporary fix until this is implented in SKSE officially.
 class SoulGemEntryData : public InventoryEntryData
 {
@@ -403,9 +416,26 @@ std::string GetJCFormString(TESForm * form)
 
 TESForm* GetJCStringForm(std::string formString)
 {
+	if (!JArray_getForm)
+		obtain_func(g_jContainersRootInterface, "getForm", "JArray", JArray_getForm);
+	if (!JValue_objectFromPrototype)
+		obtain_func(g_jContainersRootInterface, "objectFromPrototype", "JValue", JValue_objectFromPrototype);
+	if (!JValue_release)
+		obtain_func(g_jContainersRootInterface, "release", "JValue", JValue_release);
+
 	TESForm * result = nullptr;
 
-	std::vector<std::string> stringData;
+	//Turn the form's string into a single-item JSON array, then get JContainers to decode it.
+	std::string formArrayString("[ \"" + formString + "\" ]");
+	SInt32 tempJArray = JValue_objectFromPrototype(nullptr, formArrayString.c_str());
+	result = JArray_getForm(nullptr, tempJArray, 0, nullptr);
+	JValue_release(nullptr, tempJArray);
+
+	return result;
+
+	// The following works without JContainers, but is nasty and may break in future versions
+
+	/*std::vector<std::string> stringData;
 
 	std::string formData("__formData");
 
@@ -422,14 +452,6 @@ TESForm* GetJCStringForm(std::string formString)
 		stringData.push_back(token);
 	}
 	
-	/*while (std::string::npos != pos || std::string::npos != lastPos)
-	{
-		std::string token = str.substr(lastPos, pos - lastPos); 
-		stringData.push_back(BSFixedString(token.c_str()));
-		lastPos = pos; //str.find_first_not_of(delimiters, pos);
-		pos = str.find_first_of(delimiters, lastPos);
-	}*/
-
 	if (stringData[0] != formData)
 		return result;
 
@@ -463,6 +485,8 @@ TESForm* GetJCStringForm(std::string formString)
 	formId |= modIndex << 24;
 	result = LookupFormByID(formId);
 	return result;
+	
+	*/
 }
 
 //Copied from papyrusactor.cpp since it's not in the header file
@@ -1040,16 +1064,6 @@ SInt32 FillContainerFromJson(TESObjectREFR* pContainerRef, Json::Value jContaine
 	return entryList->Count();
 }
 
-SInt32(*JArray_size)(void*, SInt32 obj) = nullptr;
-TESForm* (*JArray_getForm)(void*, SInt32 obj, SInt32 idx, TESForm* def) = nullptr;
-
-template<class T>
-void obtain_func(const jc::reflection_interface *refl, const char *funcName, const char *className, T& func) {
-	assert(refl);
-	func = (T)refl->tes_function_of_class(funcName, className);
-	assert(func);
-}
-
 namespace papyrusSuperStash
 {
 	void TraceConsole(StaticFunctionTag*, BSFixedString theString)
@@ -1358,7 +1372,6 @@ namespace papyrusSuperStash
 
 	SInt32 FillContainerFromJSON(StaticFunctionTag*, TESObjectREFR* pContainerRef, BSFixedString filePath)
 	{
-		obtain_func(g_jContainersRootInterface, "count", "JArray", JArray_size);
 		Json::Value jsonData;
 		LoadJsonFromFile(filePath.data, jsonData);
 		if (jsonData.empty())
