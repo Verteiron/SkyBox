@@ -117,6 +117,8 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\dep\nioverride\interfaces\IPluginInterface.h" />
+    <ClInclude Include="..\dep\nioverride\ItemDataInterface.h" />
     <ClInclude Include="PapyrusSuperStash.h" />
   </ItemGroup>
   <ItemGroup>

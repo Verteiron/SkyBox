@@ -4,8 +4,6 @@
 
 #include "json/json.h"
 
-#include "skse/PluginAPI.h"
-#include "skse/skse_version.h"
 #include "skse/GameData.h"
 #include "skse/GameRTTI.h"
 #include "skse/GameExtraData.h"
@@ -13,6 +11,7 @@
 
 //#include "skse/PapyrusObjectReference.h"
 #include "skse/PapyrusWornObject.h"
+#include "skse/PapyrusSKSE.h"
 #include "skse/PapyrusSpell.h"
 
 #include "skse/HashUtil.h"
@@ -25,6 +24,13 @@
 //#include <sstream>
 
 #include "PapyrusSuperStash.h"
+
+//#include "skse/skse_version.h"
+//#include "skse/PluginManager.h"
+
+//#include "skse/PluginAPI.h"
+
+//#include "nioverride/ItemDataInterface.h"
 
 typedef std::vector<TESForm*> FormVec;
 
@@ -460,7 +466,7 @@ TESForm* GetJCStringForm(std::string formString)
 }
 
 //Copied from papyrusactor.cpp since it's not in the header file
-SInt32 CalcItemId(TESForm * form, BaseExtraList * extraList)
+SInt32 ssCalcItemId(TESForm * form, BaseExtraList * extraList)
 {
 	if (!form || !extraList)
 		return 0;
@@ -558,7 +564,7 @@ Json::Value GetExtraDataJSON(TESForm* form, BaseExtraList* bel)
 
 	if (sDisplayName && (sDisplayName != pFullName->name.data)) {
 		jBaseExtraList["displayName"] = sDisplayName;
-		UInt32 itemID = CalcItemId(form, bel); //ItemID as used by WornObject and SkyUI, might be useful
+		UInt32 itemID = ssCalcItemId(form, bel); //ItemID as used by WornObject and SkyUI, might be useful
 		if (itemID)
 			jBaseExtraList["itemID"] = (Json::Int)itemID;
 	}
@@ -1028,7 +1034,7 @@ SInt32 FillContainerFromJson(TESObjectREFR* pContainerRef, Json::Value jContaine
 				}
 			}
 		}
-		entryList->Dump();
+		//entryList->Dump();
 	}
 
 	return entryList->Count();

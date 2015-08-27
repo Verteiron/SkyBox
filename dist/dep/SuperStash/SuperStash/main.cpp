@@ -1,24 +1,85 @@
 #include <ShlObj.h>
 
-#include "common/IPrefix.h"
-
 #include "skse/PluginAPI.h"
 #include "skse/skse_version.h"
 #include "skse/SafeWrite.h"
+#include "skse/ScaleformCallbacks.h"
+#include "skse/ScaleformMovie.h"
 #include "skse/GameAPI.h"
 
+#include "jContainers/jc_interface.h"
+#include "nioverride/ItemDataInterface.h"
 #include "PapyrusSuperStash.h"
 
 IDebugLog	gLog;
 
 PluginHandle	g_pluginHandle = kPluginHandle_Invalid;
 
-SKSEPapyrusInterface			* g_papyrus = NULL;
+SKSEMessagingInterface *g_messaging = NULL;
+
+SKSEPapyrusInterface              * g_papyrus = NULL;
+ItemDataInterface       * g_itemDataInterface = NULL;
 
 extern "C"
 {
 
 #define MIN_PAP_VERSION 1
+
+
+
+	void JCMessageHandler(SKSEMessagingInterface::Message * message)
+	{
+		_MESSAGE("Got message from %s of type %d", std::string(message->sender).c_str(), message->type);
+		if (message && message->type == jc::message_root_interface) {
+			//OnJCAPIAvailable(jc::root_interface::from_void(msg->data));
+			_MESSAGE("Got JC Interface!:D");
+		}
+	}
+		
+	void NIOMessageHandler(SKSEMessagingInterface::Message * message)
+	{
+		_MESSAGE("Got message from %s of type %d", std::string(message->sender).c_str(), message->type);
+	}
+
+	void SKSEMessageHandler(SKSEMessagingInterface::Message * message)
+	{
+		//_MESSAGE("Got message from %s of type %d", std::string(message->sender).c_str(), message->type);
+		switch (message->type)
+		{
+		case SKSEMessagingInterface::kMessage_PostLoad:
+		{
+			g_messaging->RegisterListener(g_pluginHandle, "nioverride", NIOMessageHandler);
+			g_messaging->RegisterListener(g_pluginHandle, "JContainers", JCMessageHandler);
+
+			//_MESSAGE("Got kMessage_PostLoad message from SKSE!");
+			InterfaceExchangeMessage message;
+			_MESSAGE("Dispatching InterfaceExchangeMessage from plugin %d (me) to nioverride", g_pluginHandle);
+			if (!g_messaging->Dispatch(g_pluginHandle, InterfaceExchangeMessage::kMessage_ExchangeInterface, (void*)&message, sizeof(InterfaceExchangeMessage*), "nioverride")) {
+				_MESSAGE("NIOverride not listening for us, so we'll pretend to be chargen.dll ...");
+				int i = 1;
+				while (!(message.interfaceMap) && (i < 20)) {
+					if (g_messaging->Dispatch(i, InterfaceExchangeMessage::kMessage_ExchangeInterface, (void*)&message, sizeof(InterfaceExchangeMessage*), "nioverride")) {
+						_MESSAGE("... Success!");
+					}
+					i++;
+					if (i == g_pluginHandle)
+						i++;
+				}
+			}
+			if (message.interfaceMap) {
+				g_itemDataInterface = (ItemDataInterface*)message.interfaceMap->QueryInterface("ItemData");
+				if (g_itemDataInterface) {
+					_MESSAGE("Got ItemDataInterface!");
+				}
+				else {
+					_MESSAGE("Couldn't get ItemDataInterface!");
+				}
+			}
+		}
+		break;
+		}
+	}
+
 
 bool SKSEPlugin_Query(const SKSEInterface * skse, PluginInfo * info)
 {
@@ -56,6 +117,10 @@ bool SKSEPlugin_Query(const SKSEInterface * skse, PluginInfo * info)
 		_FATALERROR("papyrus interface too old (%d expected %d)", g_papyrus->interfaceVersion, MIN_PAP_VERSION);
 		return false;
 	}
+	g_messaging = (SKSEMessagingInterface *)skse->QueryInterface(kInterface_Messaging);
+	if (!g_messaging) {
+		_ERROR("couldn't get messaging interface");
+	}
 
 	// supported runtime version
 	return true;
@@ -69,6 +134,9 @@ bool RegisterFuncs(VMClassRegistry * registry)
 
 bool SKSEPlugin_Load(const SKSEInterface * skse)
 {
+	if (g_messaging)
+		g_messaging->RegisterListener(g_pluginHandle, "SKSE", SKSEMessageHandler);
+
 	if (g_papyrus)
 		g_papyrus->Register(RegisterFuncs);
 

@@ -14,4 +14,5 @@ namespace papyrusSuperStash
 {
 	void RegisterFuncs(VMClassRegistry* registry);
 
+	SInt32 FillContainerFromJSON(StaticFunctionTag*, TESObjectREFR* pContainerRef, BSFixedString filePath);
 }
