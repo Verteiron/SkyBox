@@ -8,7 +8,7 @@
 #include "skse/GameAPI.h"
 
 #include "jContainers/jc_interface.h"
-#include "nioverride/ItemDataInterface.h"
+
 #include "PapyrusSuperStash.h"
 
 IDebugLog	gLog;
@@ -18,6 +18,7 @@ PluginHandle	g_pluginHandle = kPluginHandle_Invalid;
 SKSEMessagingInterface *g_messaging = NULL;
 
 SKSEPapyrusInterface              * g_papyrus = NULL;
+
 ItemDataInterface       * g_itemDataInterface = NULL;
 
 extern "C"

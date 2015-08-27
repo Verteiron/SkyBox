@@ -1,8 +1,10 @@
+#include <shlobj.h>
+#include <functional>
+#include <random>
+#include <algorithm>
 
 #include "common/IPrefix.h"
 #include "common/IFileStream.h"
-
-#include "json/json.h"
 
 #include "skse/GameData.h"
 #include "skse/GameRTTI.h"
@@ -16,12 +18,10 @@
 
 #include "skse/HashUtil.h"
 
-#include <shlobj.h>
-#include <functional>
-#include <random>
-#include <algorithm>
 //#include <iostream>
 //#include <sstream>
+
+#include "json/json.h"
 
 #include "PapyrusSuperStash.h"
 
@@ -1348,6 +1348,8 @@ namespace papyrusSuperStash
 
 	SInt32 FillContainerFromJSON(StaticFunctionTag*, TESObjectREFR* pContainerRef, BSFixedString filePath)
 	{
+		ModifiedItemIdentifier miiTest;
+		g_itemDataInterface->GetItemUniqueID(pContainerRef, miiTest, false);
 		Json::Value jsonData;
 		LoadJsonFromFile(filePath.data, jsonData);
 		if (jsonData.empty())
