@@ -1040,6 +1040,16 @@ SInt32 FillContainerFromJson(TESObjectREFR* pContainerRef, Json::Value jContaine
 	return entryList->Count();
 }
 
+SInt32(*JArray_size)(void*, SInt32 obj) = nullptr;
+TESForm* (*JArray_getForm)(void*, SInt32 obj, SInt32 idx, TESForm* def) = nullptr;
+
+template<class T>
+void obtain_func(const jc::reflection_interface *refl, const char *funcName, const char *className, T& func) {
+	assert(refl);
+	func = (T)refl->tes_function_of_class(funcName, className);
+	assert(func);
+}
+
 namespace papyrusSuperStash
 {
 	void TraceConsole(StaticFunctionTag*, BSFixedString theString)
@@ -1348,8 +1358,7 @@ namespace papyrusSuperStash
 
 	SInt32 FillContainerFromJSON(StaticFunctionTag*, TESObjectREFR* pContainerRef, BSFixedString filePath)
 	{
-		ModifiedItemIdentifier miiTest;
-		g_itemDataInterface->GetItemUniqueID(pContainerRef, miiTest, false);
+		obtain_func(g_jContainersRootInterface, "count", "JArray", JArray_size);
 		Json::Value jsonData;
 		LoadJsonFromFile(filePath.data, jsonData);
 		if (jsonData.empty())

@@ -7,8 +7,6 @@
 #include "skse/ScaleformMovie.h"
 #include "skse/GameAPI.h"
 
-#include "jContainers/jc_interface.h"
-
 #include "PapyrusSuperStash.h"
 
 IDebugLog	gLog;
@@ -21,19 +19,30 @@ SKSEPapyrusInterface              * g_papyrus = NULL;
 
 ItemDataInterface       * g_itemDataInterface = NULL;
 
+const jc::reflection_interface * g_jContainersRootInterface = NULL;
+
 extern "C"
 {
 
 #define MIN_PAP_VERSION 1
 
+	void OnJCAPIAvailable(const jc::root_interface * root) {
 
+		_MESSAGE("OnJCAPIAvailable");
+
+		// Current API is not very usable - you'll have to obtain functions manually:
+
+		g_jContainersRootInterface = root->query_interface<jc::reflection_interface>();
+
+	}
 
 	void JCMessageHandler(SKSEMessagingInterface::Message * message)
 	{
 		_MESSAGE("Got message from %s of type %d", std::string(message->sender).c_str(), message->type);
 		if (message && message->type == jc::message_root_interface) {
-			//OnJCAPIAvailable(jc::root_interface::from_void(msg->data));
-			_MESSAGE("Got JC Interface!:D");
+			OnJCAPIAvailable(jc::root_interface::from_void(message->data));
+			if (g_jContainersRootInterface)
+				_MESSAGE("Got JC Interface!:D");
 		}
 	}
 		
