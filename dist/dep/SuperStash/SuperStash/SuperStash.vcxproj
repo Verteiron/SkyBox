@@ -53,7 +53,7 @@
       <Optimization>Disabled</Optimization>
       <SDLCheck>
       </SDLCheck>
-      <AdditionalIncludeDirectories>$(SolutionDir)\dep;$(SolutionDir)\dep\skse;$(SolutionDir)\dep\jsoncpp;$(ProjectDir);$(SolutionDir)\dep\ziputils;$(SolutionDir)\dep\jsoncpp;$(ProjectDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)\dep;$(SolutionDir)\dep\skse;$(SolutionDir)\dep\jsoncpp;$(ProjectDir);$(SolutionDir)\dep\ziputils;$(ProjectDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <PrecompiledHeader />
       <StringPooling>true</StringPooling>
@@ -95,6 +95,7 @@
       <PrecompiledHeader />
       <StringPooling>true</StringPooling>
       <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;WIN32_LEAN_AND_MEAN;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ForcedIncludeFiles>common/IPrefix.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -111,6 +112,7 @@
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="jc_functions.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="PapyrusSuperStash.cpp">
       <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">WIN32;_DEBUG;_WINDOWS;_USRDLL;PLUGIN_EXAMPLE_EXPORTS;_CRT_SECURE_NO_WARNINGS;WIN32_LEAN_AND_MEAN;%(PreprocessorDefinitions)</PreprocessorDefinitions>
@@ -119,6 +121,7 @@
   <ItemGroup>
     <ClInclude Include="..\dep\nioverride\interfaces\IPluginInterface.h" />
     <ClInclude Include="..\dep\nioverride\ItemDataInterface.h" />
+    <ClInclude Include="jc_functions.h" />
     <ClInclude Include="PapyrusSuperStash.h" />
   </ItemGroup>
   <ItemGroup>

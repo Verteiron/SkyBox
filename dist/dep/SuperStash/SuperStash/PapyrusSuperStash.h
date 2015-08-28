@@ -12,10 +12,8 @@ struct StaticFunctionTag;
 #include "skse/GameAPI.h"
 
 #include "nioverride/ItemDataInterface.h"
-#include "jContainers/jc_interface.h"
 
 extern ItemDataInterface		* g_itemDataInterface;
-extern const jc::reflection_interface * g_jContainersRootInterface;
 
 namespace papyrusSuperStash
 {
