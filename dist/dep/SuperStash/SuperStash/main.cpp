@@ -6,7 +6,7 @@
 #include "skse/GameAPI.h"
 
 #include "PapyrusSuperStash.h"
-#include "jc_functions.h"
+#include "jcutils.h"
 
 IDebugLog	gLog;
 

@@ -19,3 +19,6 @@ void OnJCAPIAvailable(const jc::root_interface * root);
 void JCMessageHandler(SKSEMessagingInterface::Message * message);
 
 bool JCAvailable();
+
+std::string GetJCFormString(TESForm * form);
+TESForm* GetJCStringForm(std::string formString);

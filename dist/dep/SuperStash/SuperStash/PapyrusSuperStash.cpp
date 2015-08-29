@@ -3,8 +3,6 @@
 #include <random>
 #include <algorithm>
 
-#include "common/IFileStream.h"
-
 #include "skse/GameData.h"
 #include "skse/GameRTTI.h"
 #include "skse/GameExtraData.h"
@@ -13,27 +11,14 @@
 #include "skse/PapyrusSKSE.h"
 #include "skse/PapyrusSpell.h"
 
-#include "skse/HashUtil.h"
-
 #include "json/json.h"
 
+#include "fileutils.h"
+#include "itemutils.h"
+#include "jcutils.h"
 #include "PapyrusSuperStash.h"
-#include "jc_functions.h"
 
 typedef std::vector<TESForm*> FormVec;
-
-//Temporary fix until this is implented in SKSE officially.
-class SoulGemEntryData : public InventoryEntryData
-{
-public:
-	//MEMBER_FN_PREFIX(InventoryEntryData);
-	DEFINE_MEMBER_FN(GetSoulLevel, UInt32, 0x004756F0);
-};
-
-bool IsPlayerPotion(TESForm* potion)
-{
-	return (bool)(potion->formID >> 24 == 0xff && (potion->formType == AlchemyItem::kTypeID));
-}
 
 void VisitFormList(BGSListForm * formList, std::function<void(TESForm*)> functor)
 {
@@ -53,279 +38,6 @@ void VisitFormList(BGSListForm * formList, std::function<void(TESForm*)> functor
 			if (childForm)
 				functor(childForm);
 		}
-	}
-}
-
-//Copied from referenceUtils::CreateEnchantment, modified to accept non-VM arrays
-void CreateEnchantmentFromVectors(TESForm* baseForm, BaseExtraList * extraData, float maxCharge, std::vector<EffectSetting*> effects, std::vector<float> magnitudes, std::vector<UInt32> areas, std::vector<UInt32> durations)
-{
-	if (baseForm && (baseForm->formType == TESObjectWEAP::kTypeID || baseForm->formType == TESObjectARMO::kTypeID)) {
-		EnchantmentItem * enchantment = NULL;
-		if (effects.size() > 0 && magnitudes.size() == effects.size() && areas.size() == effects.size() && durations.size() == effects.size()) {
-			tArray<MagicItem::EffectItem> effectItems;
-			effectItems.Allocate(effects.size());
-
-			UInt32 j = 0;
-			for (UInt32 i = 0; i < effects.size(); i++) {
-				EffectSetting * magicEffect = effects[i];
-				if (magicEffect) { // Only add effects that actually exist
-					effectItems[j].magnitude = magnitudes[i];
-					effectItems[j].area = areas[i];
-					effectItems[j].duration = durations[i];
-					effectItems[j].mgef = magicEffect;
-					j++;
-				}
-			}
-			effectItems.count = j; // Set count to existing count
-
-			if (baseForm->formType == TESObjectWEAP::kTypeID)
-				enchantment = CALL_MEMBER_FN(PersistentFormManager::GetSingleton(), CreateOffensiveEnchantment)(&effectItems);
-			else
-				enchantment = CALL_MEMBER_FN(PersistentFormManager::GetSingleton(), CreateDefensiveEnchantment)(&effectItems);
-
-			FormHeap_Free(effectItems.arr.entries);
-		}
-
-		if (enchantment) {
-			if (maxCharge > 0xFFFF) // Charge exceeds uint16 clip it
-				maxCharge = 0xFFFF;
-
-			ExtraEnchantment* extraEnchant = static_cast<ExtraEnchantment*>(extraData->GetByType(kExtraData_Enchantment));
-			if (extraEnchant) {
-				PersistentFormManager::GetSingleton()->DecRefEnchantment(extraEnchant->enchant);
-				extraEnchant->enchant = enchantment;
-				PersistentFormManager::GetSingleton()->IncRefEnchantment(extraEnchant->enchant);
-
-				extraEnchant->maxCharge = (UInt16)maxCharge;
-			}
-			else {
-				ExtraEnchantment* extraEnchant = ExtraEnchantment::Create();
-				extraEnchant->enchant = enchantment;
-				extraEnchant->maxCharge = (UInt16)maxCharge;
-				extraData->Add(kExtraData_Enchantment, extraEnchant);
-			}
-		}
-	}
-}
-
-AlchemyItem* _CreateCustomPotionFromVector(std::vector<EffectSetting*> effects, std::vector<float> magnitudes, std::vector<UInt32> areas, std::vector<UInt32> durations, SInt32 forceType = 0)
-{
-	AlchemyItem * potion = nullptr;
-
-	bool isPoison = false;
-
-	if (effects.size() > 0 && magnitudes.size() == effects.size() && areas.size() == effects.size() && durations.size() == effects.size()) {
-		tArray<MagicItem::EffectItem> effectItems;
-		effectItems.Allocate(effects.size());
-
-		UInt32 j = 0;
-		for (UInt32 i = 0; i < effects.size(); i++) {
-			EffectSetting * magicEffect = effects[i];
-			if (magicEffect) { // Only add effects that actually exist
-				effectItems[j].magnitude = magnitudes[i];
-				effectItems[j].area = areas[i];
-				effectItems[j].duration = durations[i];
-				effectItems[j].mgef = magicEffect;
-				j++;
-			}
-		}
-		effectItems.count = j; // Set count to existing count
-
-		//Has user forced the poison setting?
-		if (forceType == 1) {
-			isPoison = false;
-		}
-		else if (forceType == 2) {
-			isPoison = true;
-		}
-		else {
-			//Auto-determine if it's poison
-			UInt32 archetype = effectItems[0].mgef->properties.archetype;
-			UInt32 isDetrimental = (effectItems[0].mgef->properties.flags & EffectSetting::Properties::kEffectType_Detrimental) != 0;
-
-			switch (archetype)
-			{
-			case EffectSetting::Properties::kArchetype_ValueMod:
-			case EffectSetting::Properties::kArchetype_DualValueMod:
-			case EffectSetting::Properties::kArchetype_PeakValueMod:
-			{
-				isPoison = isDetrimental ? true : false;
-				break;
-			}
-			case EffectSetting::Properties::kArchetype_Absorb:
-			case EffectSetting::Properties::kArchetype_CureDisease:
-			case EffectSetting::Properties::kArchetype_Invisibility:
-			case EffectSetting::Properties::kArchetype_CureParalysis:
-			case EffectSetting::Properties::kArchetype_CureAddiction:
-			case EffectSetting::Properties::kArchetype_CurePoison:
-			case EffectSetting::Properties::kArchetype_Dispel:
-			{
-				isPoison = false;
-				break;
-			}
-			case EffectSetting::Properties::kArchetype_Frenzy:
-			case EffectSetting::Properties::kArchetype_Calm:
-			case EffectSetting::Properties::kArchetype_Demoralize:
-			case EffectSetting::Properties::kArchetype_Paralysis:
-			{
-				isPoison = true;
-				break;
-			}
-			}
-		}
-		if (isPoison) {
-			CALL_MEMBER_FN(PersistentFormManager::GetSingleton(), CreatePoison)(&potion, &effectItems);
-		}
-		else {
-			CALL_MEMBER_FN(PersistentFormManager::GetSingleton(), CreatePotion)(&potion, &effectItems);
-		}
-
-		FormHeap_Free(effectItems.arr.entries);
-	}
-
-	return (AlchemyItem*)potion;
-}
-
-AlchemyItem* _CreateCustomPotion(VMArray<EffectSetting*> effects, VMArray<float> magnitudes, VMArray<UInt32> areas, VMArray<UInt32> durations, SInt32 forceType = 0)
-{
-	AlchemyItem * potion = nullptr;
-
-	std::vector<EffectSetting*> effects_v;
-	std::vector<float> magnitudes_v;
-	std::vector<UInt32> areas_v;
-	std::vector<UInt32> durations_v;
-
-	for (UInt32 i = 0; i < effects.Length(); i++) {
-		float magnitude = 0;
-		UInt32 area = 0;
-		UInt32 duration = 0;
-		EffectSetting * magicEffect = NULL;
-		effects.Get(&magicEffect, i);
-		if (magicEffect) { // Only add effects that actually exist
-			magnitudes.Get(&magnitude, i);
-			areas.Get(&area, i);
-			durations.Get(&duration, i);
-			effects_v.push_back(magicEffect);
-			magnitudes_v.push_back(magnitude);
-			areas_v.push_back(area);
-			durations_v.push_back(duration);
-		}
-	}
-
-	return _CreateCustomPotionFromVector(effects_v, magnitudes_v, areas_v, durations_v, forceType);
-}
-
-
-bool isReadable(const std::string& name) {
-	FILE *file;
-	
-	if (fopen_s(&file, name.c_str(), "r") == 0) {
-		fclose(file);
-		return true;
-	}
-	else {
-		return false;
-	}
-}
-
-std::string GetSSDirectory()
-{
-	char path[MAX_PATH];
-	if (!SUCCEEDED(SHGetFolderPath(NULL, CSIDL_MYDOCUMENTS | CSIDL_FLAG_CREATE, NULL, SHGFP_TYPE_CURRENT, path)))
-	{
-		return std::string();
-	}
-	strcat_s(path, sizeof(path), "\\My Games\\Skyrim\\SuperStash\\");
-	return path;
-}
-
-UInt32 SSCopyFile(LPCSTR lpExistingFileName, LPCSTR lpNewFileName)
-{
-	UInt32 ret = 0;
-	if (!isReadable(lpExistingFileName))
-	{
-		return ERROR_FILE_NOT_FOUND;
-	}
-	IFileStream::MakeAllDirs(lpNewFileName);
-	if (!CopyFile(lpExistingFileName, lpNewFileName, false)) {
-		UInt32 lastError = GetLastError();
-		ret = lastError;
-		switch (lastError) {
-		case ERROR_FILE_NOT_FOUND: // We don't need to display a message for this
-			break;
-		default:
-			_ERROR("%s - error copying file %s (Error %d)", __FUNCTION__, lpExistingFileName, lastError);
-			break;
-		}
-	}
-	return ret;
-}
-
-UInt32 SSMoveFile(LPCSTR lpExistingFileName, LPCSTR lpNewFileName)
-{
-	UInt32 ret = 0;
-	if (!isReadable(lpExistingFileName))
-	{
-		return ERROR_FILE_NOT_FOUND;
-	}
-	IFileStream::MakeAllDirs(lpNewFileName);
-	if (!MoveFile(lpExistingFileName, lpNewFileName)) {
-		UInt32 lastError = GetLastError();
-		ret = lastError;
-		switch (lastError) {
-		case ERROR_FILE_NOT_FOUND: // We don't need to display a message for this
-			break;
-		default:
-			_ERROR("%s - error moving file %s (Error %d)", __FUNCTION__, lpExistingFileName, lastError);
-			break;
-		}
-	}
-	return ret;
-}
-
-UInt32 SSDeleteFile(LPCSTR lpExistingFileName)
-{
-	UInt32 ret = 0;
-	if (!isReadable(lpExistingFileName))
-	{
-		return ERROR_FILE_NOT_FOUND;
-	}
-	if (!DeleteFile(lpExistingFileName)) {
-		UInt32 lastError = GetLastError();
-		ret = lastError;
-		_ERROR("%s - error moving file %s (Error %d)", __FUNCTION__, lpExistingFileName, lastError);
-	}
-	return ret;
-}
-
-bool IsObjectFavorited(TESForm * form)
-{
-	PlayerCharacter* player = (*g_thePlayer);
-	if (!player || !form)
-		return false;
-
-	UInt8 formType = form->formType;
-
-	// Spell or shout - check MagicFavorites
-	if (formType == kFormType_Spell || formType == kFormType_Shout)
-	{
-		MagicFavorites * magicFavorites = MagicFavorites::GetSingleton();
-
-		return magicFavorites && magicFavorites->IsFavorited(form);
-	}
-	// Other - check ExtraHotkey. Any hotkey data (including -1) means favorited
-	else
-	{
-		bool result = false;
-
-		ExtraContainerChanges* pContainerChanges = static_cast<ExtraContainerChanges*>(player->extraData.GetByType(kExtraData_ContainerChanges));
-		if (pContainerChanges) {
-			HotkeyData data = pContainerChanges->FindHotkey(form);
-			if (data.pHotkey)
-				result = true;
-		}
-
-		return result;
 	}
 }
 
@@ -358,125 +70,6 @@ bool LoadJsonFromFile(const char * filePath, Json::Value &jsonData)
 		return true;
 	}
 	return false;
-}
-
-std::string GetJCFormString(TESForm * form)
-{
-	/*	Return JContainer-style form serialization
-		"__formData|Skyrim.esm|0x1396a"
-		"__formData|Dragonborn.esm|0x24037"
-		"__formData||0xff000960"					*/
-
-	if (!form)
-	{
-		return NULL;
-	}
-	const char * modName = nullptr;
-
-	UInt8 modIndex = form->formID >> 24;
-	if (modIndex < 255)
-	{
-		DataHandler* pDataHandler = DataHandler::GetSingleton();
-		ModInfo* modInfo = pDataHandler->modList.modInfoList.GetNthItem(modIndex);
-		modName = (modInfo) ? modInfo->name : NULL;
-	}
-
-	UInt32 modFormID = (modName) ? (form->formID & 0xFFFFFF) : form->formID;
-	
-	char returnStr[MAX_PATH];
-	sprintf_s(returnStr, "__formData|%s|0x%x", (modName) ? (modName) : "", modFormID);
-
-	return returnStr;
-}
-
-TESForm* GetJCStringForm(std::string formString)
-{
-	TESForm * result = nullptr;
-
-	// If JContainers is around, use it to get the form. Otherwise use our own method.
-	if (JCAvailable()) {
-		//Turn the string into a single-item JSON array, then get JContainers to retrieve the form.
-		std::string formArrayString("[ \"" + formString + "\" ]");
-		SInt32 tempJArray = JValue_objectFromPrototype(nullptr, formArrayString.c_str());
-		result = JArray_getForm(nullptr, tempJArray, 0, nullptr);
-		JValue_release(nullptr, tempJArray);
-
-		return result;
-	}
-	// The following works without JContainers, but is nasty and may break in future versions
-
-	std::vector<std::string> stringData;
-
-	std::string formData("__formData");
-
-	std::string testString("__formData||0xff001953");
-
-	if (testString == formString)
-		_DMESSAGE("Do something!");
-
-	std::istringstream str(formString);
-	
-	std::string token;
-	while (std::getline(str, token, '|')) {
-		//std::cout << token << std::endl;
-		stringData.push_back(token);
-	}
-	
-	if (stringData[0] != formData)
-		return result;
-
-	if (!stringData[2].length())
-		return result;
-
-	UInt8 modIndex = 0xff;
-
-	if (stringData[1].length()) {
-		DataHandler* pDataHandler = DataHandler::GetSingleton();
-		modIndex = pDataHandler->GetModIndex(stringData[1].c_str());
-	}
-	
-	if (modIndex == 0xff)
-		return result;
-
-	std::string formIdString(stringData[2].c_str());
-
-	UInt32 formId;
-
-	try {
-		formId = std::stoul(std::string(formIdString.begin(), formIdString.end()), nullptr, 0);
-	}
-	catch (const std::invalid_argument&) {
-		return result;
-	}
-	catch (const std::out_of_range&) {
-		return result;
-	}
-
-	formId |= modIndex << 24;
-	result = LookupFormByID(formId);
-	return result;
-}
-
-//Copied from papyrusactor.cpp since it's not in the header file
-SInt32 ssCalcItemId(TESForm * form, BaseExtraList * extraList)
-{
-	if (!form || !extraList)
-		return 0;
-
-	const char * name = extraList->GetDisplayName(form);
-
-	// No name in extra data? Use base form name
-	if (!name)
-	{
-		TESFullName* pFullName = DYNAMIC_CAST(form, TESForm, TESFullName);
-		if (pFullName)
-			name = pFullName->name.data;
-	}
-
-	if (!name)
-		return 0;
-
-	return (SInt32)HashUtil::CRC32(name, form->formID & 0x00FFFFFF);
 }
 
 bool WriteItemData(TESForm* form, Json::Value jItemData)
@@ -612,6 +205,17 @@ Json::Value GetExtraDataJSON(TESForm* form, BaseExtraList* bel)
 	return jBaseExtraList;
 }
 
+bool IsWorthLoading(Json::Value jBaseExtraData)
+{
+	if (jBaseExtraData.empty())
+		return false;
+
+	return (jBaseExtraData["displayName"].isString()
+		|| jBaseExtraData["enchantment"].isObject()
+		|| jBaseExtraData["itemCharge"].isNumeric()
+		|| jBaseExtraData["soulSize"].isNumeric());
+}
+
 bool IsWorthSaving(BaseExtraList * bel) 
 {
 	if (!bel)
@@ -622,6 +226,20 @@ bool IsWorthSaving(BaseExtraList * bel)
 		||  bel->HasType(kExtraData_Enchantment)
 		||  bel->HasType(kExtraData_Charge)
 		||  bel->HasType(kExtraData_Soul));
+}
+
+//Removes (Fine), (Flawless), (Legendary) etc. Will also remove (foo).
+std::string StripWeaponHealth(std::string displayName)
+{
+	//std::string displayName(jBaseExtraData["displayName"].asString());
+	std::istringstream str(displayName);
+	std::vector<std::string> stringData;
+	std::string token;
+	while (std::getline(str, token, '(')) {
+		stringData.push_back(token);
+	}
+	return stringData[0].substr(0, stringData[0].length() - 1);
+		
 }
 
 //Modified from PapyrusObjectReference.cpp!ExtraContainerFiller
@@ -876,6 +494,85 @@ public:
 	}
 };
 
+BaseExtraList * CreateBaseExtraListFromJson(TESForm* thisForm, Json::Value jBaseExtraData)
+{
+	if (!thisForm || jBaseExtraData.empty())
+		return nullptr;
+
+	//The following seems to successfully create a new, working BEL without crashing anything.
+	//Not 100% sure about the initialization, but so far it doesn't seem to crash...
+	
+	BaseExtraList * newBEL = (BaseExtraList *)FormHeap_Allocate(sizeof(BaseExtraList));
+	ASSERT(newBEL);
+	newBEL->m_data = nullptr;
+	//Is this right? Seems to work as is...
+	newBEL->m_presence = (BaseExtraList::PresenceBitfield*)FormHeap_Allocate(sizeof(BaseExtraList::PresenceBitfield));
+	ASSERT(newBEL->m_presence);
+	//Fill m_presence with 0s, otherwise the bad flags cause Skyrim to crash.
+	std::fill(newBEL->m_presence->bits, newBEL->m_presence->bits + 0x18, 0);
+	
+	if (jBaseExtraData["displayName"].isString()) {
+		std::string displayName(jBaseExtraData["displayName"].asString());
+		displayName = StripWeaponHealth(displayName);
+		if (displayName.length())
+			referenceUtils::SetDisplayName(newBEL, displayName.c_str(), false);
+	}
+
+	if (jBaseExtraData["enchantment"].isObject()) {
+		float maxCharge = jBaseExtraData["itemMaxCharge"].asFloat();
+
+		std::vector<EffectSetting*> effects;
+		std::vector<UInt32> durations;
+		std::vector<float> magnitudes;
+		std::vector<UInt32> areas;
+
+		int effectNum = 0;
+		for (auto & jMagicEffect : jBaseExtraData["enchantment"]["magicEffects"]) {
+			EffectSetting* effect = DYNAMIC_CAST(GetJCStringForm(jMagicEffect["form"].asString()), TESForm, EffectSetting);
+			effects.push_back(effect);
+			durations.push_back((UInt32)jMagicEffect["duration"].asInt());
+			areas.push_back((UInt32)jMagicEffect["area"].asInt());
+			magnitudes.push_back((float)jMagicEffect["magnitude"].asFloat());
+			effectNum++;
+		}
+		CreateEnchantmentFromVectors(thisForm, newBEL, maxCharge, effects, magnitudes, areas, durations);
+	}
+	if (jBaseExtraData["itemCharge"].isNumeric())
+		referenceUtils::SetItemCharge(thisForm, newBEL, jBaseExtraData["itemCharge"].asFloat());
+
+	if (jBaseExtraData["health"].isNumeric())
+		referenceUtils::SetItemHealthPercent(thisForm, newBEL, jBaseExtraData["health"].asFloat());
+
+	if (jBaseExtraData["soulSize"].isInt()) {
+		UInt8 soulLevel = jBaseExtraData["soulSize"].asInt();
+		ExtraSoul * extraSoul = static_cast<ExtraSoul*>(newBEL->GetByType(kExtraData_Soul));
+		if (extraSoul) {
+			extraSoul->count = soulLevel;
+		}
+		else {
+			extraSoul = ExtraSoul::Create();
+			extraSoul->count = (UInt8)soulLevel;
+			newBEL->Add(kExtraData_Soul, extraSoul);
+		}
+	}
+
+	if (jBaseExtraData["count"].isInt()) {
+		UInt32 thisCount = jBaseExtraData["count"].asInt();
+		ExtraCount * extraCount = static_cast<ExtraCount*>(newBEL->GetByType(kExtraData_Count));
+		if (extraCount) {
+			extraCount->count = thisCount;
+		}
+		else {
+			extraCount = ExtraCount::Create();
+			extraCount->count = (UInt8)thisCount;
+			newBEL->Add(kExtraData_Count, extraCount);
+		}
+	}
+
+	return newBEL;
+}
+
+//This should only be called on empty containers, at least for now.
 SInt32 FillContainerFromJson(TESObjectREFR* pContainerRef, Json::Value jContainerData)
 {
 	SInt32 result = 0;
@@ -940,89 +637,13 @@ SInt32 FillContainerFromJson(TESObjectREFR* pContainerRef, Json::Value jContaine
 					edl = ExtendDataList::Create();
 					thisEntry->extendDataList = edl;
 				}
-				//** Can't repopulate BELs until we figure out a way to create them from scratch
-				//newEntry->extendDataList->Dump();
-				int i = 0;
+				//If anything in this plugin causes leaks or other Bad Things, it's probably this next bit.
 				for (auto & jBaseExtraData : jExtendDataList) {
-					BaseExtraList * newBEL = thisEntry->extendDataList->GetNthItem(i);
-					if (!newBEL) {
-						newBEL = (BaseExtraList *)FormHeap_Allocate(sizeof(BaseExtraList));
-						ASSERT(newBEL);
-						newBEL->m_data = NULL;
-						newBEL->m_presence = (BaseExtraList::PresenceBitfield*)FormHeap_Allocate(sizeof(BaseExtraList::PresenceBitfield));
-						ASSERT(newBEL->m_presence);
-						std::fill(newBEL->m_presence->bits, newBEL->m_presence->bits + 0x18, 0);
+					if (IsWorthLoading(jBaseExtraData)) {
+						BaseExtraList * newBEL = CreateBaseExtraListFromJson(thisForm, jBaseExtraData);
+						if (newBEL->m_data)
+							edl->Push(newBEL);
 					}
-					if (jBaseExtraData["displayName"].isString()) {
-						std::string displayName(jBaseExtraData["displayName"].asString());
-						std::istringstream str(displayName);
-						std::vector<std::string> stringData;
-						std::string token;
-						while (std::getline(str, token, '(')) {
-							stringData.push_back(token);
-						}
-						referenceUtils::SetDisplayName(newBEL, stringData[0].substr(0, stringData[0].length() - 1).c_str(), false);
-					}
-					if (jBaseExtraData["enchantment"].isObject()) {
-						float maxCharge = jBaseExtraData["itemMaxCharge"].asFloat();
-						
-						std::vector<EffectSetting*> effects;
-						std::vector<UInt32> durations;
-						std::vector<float> magnitudes;
-						std::vector<UInt32> areas;
-						
-						int effectNum = 0;
-						for (auto & jMagicEffect : jBaseExtraData["enchantment"]["magicEffects"]) {
-							EffectSetting* effect = DYNAMIC_CAST(GetJCStringForm(jMagicEffect["form"].asString()), TESForm, EffectSetting);
-							effects.push_back(effect);
-							durations.push_back((UInt32)jMagicEffect["duration"].asInt());
-							areas.push_back((UInt32)jMagicEffect["area"].asInt());
-							magnitudes.push_back((float)jMagicEffect["magnitude"].asFloat());
-							effectNum++;
-						}
-						CreateEnchantmentFromVectors(thisForm, newBEL, maxCharge, effects, magnitudes, areas, durations);
-					}
-					if (jBaseExtraData["itemCharge"].isNumeric())
-						referenceUtils::SetItemCharge(thisForm, newBEL, jBaseExtraData["itemCharge"].asFloat());
-					
-					if (jBaseExtraData["health"].isNumeric())
-						referenceUtils::SetItemHealthPercent(thisForm, newBEL, jBaseExtraData["health"].asFloat());
-											
-					if (jBaseExtraData["soulSize"].isInt()) {
-						UInt8 soulLevel = jBaseExtraData["soulSize"].asInt();
-						ExtraSoul * extraSoul = static_cast<ExtraSoul*>(newBEL->GetByType(kExtraData_Soul));
-						if (extraSoul) {
-							extraSoul->count = soulLevel;
-						}
-						else {
-							extraSoul = ExtraSoul::Create();
-							extraSoul->count = (UInt8)soulLevel;
-							newBEL->Add(kExtraData_Soul, extraSoul);
-						}
-					}
-
-					if (jBaseExtraData["count"].isInt()) {
-						UInt32 thisCount = jBaseExtraData["count"].asInt();
-						ExtraCount * extraCount = static_cast<ExtraCount*>(newBEL->GetByType(kExtraData_Count));
-						if (extraCount) {
-							extraCount->count = thisCount;
-						}
-						else {
-							extraCount = ExtraCount::Create();
-							extraCount->count = (UInt8)thisCount;
-							newBEL->Add(kExtraData_Count, extraCount);
-						}
-					}
-					
-					if (newBEL->m_data) {
-						edl->Push(newBEL);
-					}
-					else {
-						//FormHeap_Free(newBEL->m_data);
-						FormHeap_Free(newBEL->m_presence);
-						FormHeap_Free(newBEL);
-					}
-					i++;
 				}
 			}
 		}
@@ -1047,56 +668,7 @@ namespace papyrusSuperStash
 	{
 		SInt32 ret = 0;
 
-		if (maxCount < 1)
-			return ret;
-
-		char sourcePath[MAX_PATH];
-		sprintf_s(sourcePath, "%s", filename);
-
-		char drive[_MAX_DRIVE];
-		char dir[_MAX_DIR];
-		char fname[_MAX_FNAME];
-		char ext[_MAX_EXT];
-		errno_t err;
-
-		err = _splitpath_s(sourcePath, drive, _MAX_DRIVE, dir, _MAX_DIR, fname, _MAX_FNAME, ext, _MAX_EXT);
-		if (err != 0)
-		{
-			_ERROR("%s - error splitting path %s (Error %d)", __FUNCTION__, sourcePath, err);
-			return err;
-		}
-
-		char prevPath[MAX_PATH];
-		char targetPath[MAX_PATH];
-		char prevFilename[_MAX_FNAME];
-		char targetFilename[_MAX_FNAME];
-
-		//delete file.maxCount
-		sprintf_s(targetFilename, "%s.%d", fname, maxCount);
-		_makepath_s(targetPath, _MAX_PATH, drive, dir, targetFilename, ext);
-		err = SSDeleteFile(targetPath);
-		if (err != 0)
-		{
-			_ERROR("%s - error deleting file %s (Error %d)", __FUNCTION__, targetFilename, err);
-			return err;
-		}
-
-		//do file rotation
-		for (int i = maxCount - 1; i >= 0; i--) {
-			sprintf_s(targetFilename, "%s.%d", fname, i + 1);
-			sprintf_s(prevFilename, "%s.%d", fname, i);
-			_makepath_s(targetPath, _MAX_PATH, drive, dir, targetFilename, ext);
-			_makepath_s(prevPath, _MAX_PATH, drive, dir, prevFilename, ext);
-			//_DMESSAGE("Moving %s to %s", prevPath, targetPath);
-			SSMoveFile(prevPath, targetPath);
-		}
-
-		//move file.x to file.1.x
-		sprintf_s(targetFilename, "%s.%d", fname, 1);
-		_makepath_s(targetPath, _MAX_PATH, drive, dir, targetFilename, ext);
-		SSMoveFile(sourcePath, targetPath);
-
-		return ret;
+		return ssRotateFile(filename.data, maxCount);
 	}
 
 	BSFixedString UUID(StaticFunctionTag*)
@@ -1125,163 +697,7 @@ namespace papyrusSuperStash
 		s.insert(8, "-");
 		return s.c_str();
 	}
-
-	SInt32 FilterFormlist(StaticFunctionTag*, BGSListForm* sourceList, BGSListForm* filteredList, UInt32 typeFilter)
-	{
-		SInt32 formCount = 0;
-		if (sourceList && filteredList) {
-			VisitFormList(sourceList, [&](TESForm * form){
-				if (form->formType == typeFilter) {
-					formCount++;
-					CALL_MEMBER_FN(filteredList, AddFormToList)(form);
-				}
-			});
-		}
-		return formCount;
-	}
-
-	VMResultArray<TESForm*> GetFilteredList(StaticFunctionTag*, BGSListForm* sourceList, UInt32 typeFilter)
-	{
-		VMResultArray<TESForm*> result;
-		if (sourceList) {
-			VisitFormList(sourceList, [&](TESForm * form){
-				if (form->formType == typeFilter) {
-					result.push_back(form);
-				}
-			});
-		}
-		return result;
-	}
-
-	VMResultArray<SInt32> GetItemCounts(StaticFunctionTag*, VMArray<TESForm*> formArr, TESObjectREFR* object)
-	{
-		VMResultArray<SInt32> result;
-
-		TESContainer* pContainer = NULL;
-		TESForm* pBaseForm = object->baseForm;
-		if (pBaseForm)
-			pContainer = DYNAMIC_CAST(pBaseForm, TESForm, TESContainer);
-
-		ExtraContainerChanges* containerChanges = static_cast<ExtraContainerChanges*>(object->extraData.GetByType(kExtraData_ContainerChanges));
-		ExtraContainerChanges::Data* containerData = containerChanges ? containerChanges->data : NULL;
-		if (!containerData)
-			return result;
-
-		TESForm *form = NULL;
-
-		if (formArr.Length() && object) {
-			for (int i = 0; i < formArr.Length(); i++) {
-				formArr.Get(&form, i);
-				if (form) {
-					UInt32 countBase = pContainer->CountItem(form);
-					
-					UInt32 countChanges = 0;
-
-					InventoryEntryData* entryData = containerData->FindItemEntry(form);
-					
-					InventoryEntryData::EquipData itemData;
-					entryData->GetEquipItemData(itemData, 0, countBase);
-					if (entryData) {
-						countChanges = entryData->countDelta;
-						result.push_back(countBase + countChanges);
-					}
-				}
-			}
-		}
-
-		return result;
-	}
-
-	VMResultArray<SInt32> GetItemTypes(StaticFunctionTag*, VMArray<TESForm*> formArr)
-	{
-		VMResultArray<SInt32> result;
-
-		TESForm *form = NULL;
-
-		if (formArr.Length()) {
-			for (int i = 0; i < formArr.Length(); i++) {
-				formArr.Get(&form, i);
-				if (form) {
-					result.push_back(form->formType);
-				}
-			}
-		}
-
-		return result;
-	}
-
-	VMResultArray<BSFixedString> GetItemNames(StaticFunctionTag*, VMArray<TESForm*> formArr)
-	{
-		VMResultArray<BSFixedString> result;
-
-		TESForm *form = NULL;
-
-		if (formArr.Length()) {
-			for (int i = 0; i < formArr.Length(); i++) {
-				formArr.Get(&form, i);
-				if (form) {
-					TESFullName* pFullName = DYNAMIC_CAST(form, TESForm, TESFullName);
-					result.push_back(pFullName->name.data);
-				}
-			}
-		}
-
-		return result;
-	}
-
-	VMResultArray<SInt32> GetItemFavorited(StaticFunctionTag* base, VMArray<TESForm*> formArr)
-	{
-		VMResultArray<SInt32> result;
-		TESForm *form = NULL;
-
-		if (formArr.Length()) {
-			for (int i = 0; i < formArr.Length(); i++) {
-				formArr.Get(&form, i);
-				if (form) {
-					result.push_back(IsObjectFavorited(form));
-				}
-			}
-		}
-
-		return result;
-	}
-
-	VMResultArray<SInt32> GetItemHasExtraData(StaticFunctionTag*, VMArray<TESForm*> formArr)
-	{
-		VMResultArray<SInt32> result;
-
-		TESForm *form = NULL;
-
-		PlayerCharacter* player = (*g_thePlayer);
-		if (!player)
-			return result;
-		
-		ExtraContainerChanges* containerChanges = static_cast<ExtraContainerChanges*>(player->extraData.GetByType(kExtraData_ContainerChanges));
-		ExtraContainerChanges::Data* containerData = containerChanges ? containerChanges->data : NULL;
-		if (!containerData)
-			return result;
-
-		if (formArr.Length()) {
-			for (int i = 0; i < formArr.Length(); i++) {
-				formArr.Get(&form, i);
-				int thisResult = 0;
-				if (form) {
-					InventoryEntryData* formEntryData = containerData->FindItemEntry(form);
-					//TESFullName* pFullName = DYNAMIC_CAST(form, TESForm, TESFullName);
-					//_MESSAGE("Dumping extendDataList for form %08X (%s)-------", form->formID, (pFullName) ? pFullName->name.data : 0);
-					if (formEntryData) {
-						if (formEntryData->extendDataList->Count())
-							thisResult = 1;
-					}
-					//_MESSAGE("------------------------------------------------", form->formID, (pFullName) ? pFullName->name.data : 0);
-				}
-				result.push_back(thisResult);
-			}
-		}
-
-		return result;
-	}
-
+	
 	BSFixedString GetSourceMod(StaticFunctionTag*, TESForm* form)
 	{
 		if (!form)
@@ -1351,38 +767,6 @@ namespace papyrusSuperStash
 	{
 		return _CreateCustomPotion(effects, magnitudes, areas, durations, forcePotionType);
 	}
-
-	/* This won't work. :( Soulgems do not retain their ExtraSoul data outside of containers, period.
-
-	TESObjectREFR* FillSoulGem(StaticFunctionTag*, TESObjectREFR* object, SInt32 level)
-	{
-		TESSoulGem* soulgemBase = DYNAMIC_CAST(object->baseForm, TESForm, TESSoulGem);
-		if (!soulgemBase)
-			return object;
-
-		BaseExtraList * bel = &object->extraData;
-
-		for (int i = 0x01; i < 0xb3; i++) {
-			if (bel->HasType(i))
-				_DMESSAGE("Soulgem has BEL of type 0x%02x", i);
-		}
-
-		if (level && (level > 0 && level < 6)) {
-			ExtraSoul * extraSoul = static_cast<ExtraSoul*>(bel->GetByType(kExtraData_Soul));
-			if (extraSoul) {
-				extraSoul->count = level;
-			}
-			else {
-				extraSoul = ExtraSoul::Create();
-				extraSoul->count = (UInt8)level;
-				bel->Add(kExtraData_Soul, extraSoul);
-			}
-			_DMESSAGE("ExtraSoul->Count is now %d!", extraSoul->count);
-		}
-		return object;
-	}
-
-	*/
 }
 
 #include "skse/PapyrusVM.h"
@@ -1403,28 +787,7 @@ void papyrusSuperStash::RegisterFuncs(VMClassRegistry* registry)
 		new NativeFunction0<StaticFunctionTag, BSFixedString>("UUID", "SuperStash", papyrusSuperStash::UUID, registry));
 
 	registry->RegisterFunction(
-		new NativeFunction3<StaticFunctionTag, SInt32, BGSListForm*, BGSListForm*, UInt32>("FilterFormlist", "SuperStash", papyrusSuperStash::FilterFormlist, registry));
-
-	registry->RegisterFunction(
 		new NativeFunction1<StaticFunctionTag, BSFixedString, TESForm*>("GetSourceMod", "SuperStash", papyrusSuperStash::GetSourceMod, registry));
-
-	registry->RegisterFunction(
-		new NativeFunction2<StaticFunctionTag, VMResultArray<TESForm*>, BGSListForm*, UInt32>("GetFilteredList", "SuperStash", papyrusSuperStash::GetFilteredList, registry));
-
-	registry->RegisterFunction(
-		new NativeFunction2<StaticFunctionTag, VMResultArray<SInt32>, VMArray<TESForm*>, TESObjectREFR*>("GetItemCounts", "SuperStash", papyrusSuperStash::GetItemCounts, registry));
-
-	registry->RegisterFunction(
-		new NativeFunction1<StaticFunctionTag, VMResultArray<SInt32>, VMArray<TESForm*>>("GetItemTypes", "SuperStash", papyrusSuperStash::GetItemTypes, registry));
-
-	registry->RegisterFunction(
-		new NativeFunction1<StaticFunctionTag, VMResultArray<SInt32>, VMArray<TESForm*>>("GetItemFavorited", "SuperStash", papyrusSuperStash::GetItemFavorited, registry));
-
-	registry->RegisterFunction(
-		new NativeFunction1<StaticFunctionTag, VMResultArray<SInt32>, VMArray<TESForm*>>("GetItemHasExtraData", "SuperStash", papyrusSuperStash::GetItemHasExtraData, registry));
-
-	registry->RegisterFunction(
-		new NativeFunction1<StaticFunctionTag, VMResultArray<BSFixedString>, VMArray<TESForm*>>("GetItemNames", "SuperStash", papyrusSuperStash::GetItemNames, registry));
 
 	registry->RegisterFunction(
 		new NativeFunction1<StaticFunctionTag, BSFixedString, TESObjectREFR*>("GetContainerJSON", "SuperStash", papyrusSuperStash::GetContainerJSON, registry));
@@ -1438,7 +801,4 @@ void papyrusSuperStash::RegisterFuncs(VMClassRegistry* registry)
 	registry->RegisterFunction(
 		new NativeFunction5<StaticFunctionTag, AlchemyItem*, VMArray<EffectSetting*>, VMArray<float>, VMArray<UInt32>, VMArray<UInt32>, SInt32>("CreateCustomPotion", "SuperStash", papyrusSuperStash::CreateCustomPotion, registry));
 
-	/*registry->RegisterFunction(
-		new NativeFunction2<StaticFunctionTag, TESObjectREFR*, TESObjectREFR*, SInt32>("FillSoulGem", "SuperStash", papyrusSuperStash::FillSoulGem, registry));*/
-		
 }

@@ -112,7 +112,9 @@
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="jc_functions.cpp" />
+    <ClCompile Include="fileutils.cpp" />
+    <ClCompile Include="itemutils.cpp" />
+    <ClCompile Include="jcutils.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="PapyrusSuperStash.cpp">
       <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">WIN32;_DEBUG;_WINDOWS;_USRDLL;PLUGIN_EXAMPLE_EXPORTS;_CRT_SECURE_NO_WARNINGS;WIN32_LEAN_AND_MEAN;%(PreprocessorDefinitions)</PreprocessorDefinitions>
@@ -121,7 +123,9 @@
   <ItemGroup>
     <ClInclude Include="..\dep\nioverride\interfaces\IPluginInterface.h" />
     <ClInclude Include="..\dep\nioverride\ItemDataInterface.h" />
-    <ClInclude Include="jc_functions.h" />
+    <ClInclude Include="fileutils.h" />
+    <ClInclude Include="itemutils.h" />
+    <ClInclude Include="jcutils.h" />
     <ClInclude Include="PapyrusSuperStash.h" />
   </ItemGroup>
   <ItemGroup>
