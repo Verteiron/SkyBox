@@ -1,4 +1,3 @@
-#include <shlobj.h>
 #include <functional>
 #include <random>
 #include <algorithm>
@@ -19,27 +18,6 @@
 #include "PapyrusSuperStash.h"
 
 typedef std::vector<TESForm*> FormVec;
-
-void VisitFormList(BGSListForm * formList, std::function<void(TESForm*)> functor)
-{
-	for (int i = 0; i < formList->forms.count; i++)
-	{
-		TESForm* childForm = NULL;
-		if (formList->forms.GetNthItem(i, childForm))
-			functor(childForm);
-	}
-
-	// Script Added Forms
-	if (formList->addedForms) {
-		for (int i = 0; i < formList->addedForms->count; i++) {
-			UInt32 formid = 0;
-			formList->addedForms->GetNthItem(i, formid);
-			TESForm* childForm = LookupFormByID(formid);
-			if (childForm)
-				functor(childForm);
-		}
-	}
-}
 
 bool LoadJsonFromFile(const char * filePath, Json::Value &jsonData)
 {
@@ -135,6 +113,28 @@ Json::Value GetMagicItemJSON(MagicItem * pMagicItem)
 		jMagicItem["magicEffects"] = jMagicEffects;
 
 	return jMagicItem;
+}
+
+void CreateEnchantmentFromJson(TESForm* form, BaseExtraList* bel, float maxCharge, Json::Value jEnchantment)
+{
+	if (!form || !bel || !maxCharge || jEnchantment.empty())
+		return;
+
+	std::vector<EffectSetting*> effects;
+	std::vector<UInt32> durations;
+	std::vector<float> magnitudes;
+	std::vector<UInt32> areas;
+	
+	int effectNum = 0;
+	for (auto & jMagicEffect : jEnchantment["magicEffects"]) {
+		EffectSetting* effect = DYNAMIC_CAST(GetJCStringForm(jMagicEffect["form"].asString()), TESForm, EffectSetting);
+		effects.push_back(effect);
+		durations.push_back((UInt32)jMagicEffect["duration"].asInt());
+		areas.push_back((UInt32)jMagicEffect["area"].asInt());
+		magnitudes.push_back((float)jMagicEffect["magnitude"].asFloat());
+		effectNum++;
+	}
+	CreateEnchantmentFromVectors(form, bel, maxCharge, effects, magnitudes, areas, durations);
 }
 
 Json::Value GetExtraDataJSON(TESForm* form, BaseExtraList* bel)
@@ -518,24 +518,8 @@ BaseExtraList * CreateBaseExtraListFromJson(TESForm* thisForm, Json::Value jBase
 			referenceUtils::SetDisplayName(newBEL, displayName.c_str(), false);
 	}
 
-	if (jBaseExtraData["enchantment"].isObject()) {
-		float maxCharge = jBaseExtraData["itemMaxCharge"].asFloat();
-
-		std::vector<EffectSetting*> effects;
-		std::vector<UInt32> durations;
-		std::vector<float> magnitudes;
-		std::vector<UInt32> areas;
-
-		int effectNum = 0;
-		for (auto & jMagicEffect : jBaseExtraData["enchantment"]["magicEffects"]) {
-			EffectSetting* effect = DYNAMIC_CAST(GetJCStringForm(jMagicEffect["form"].asString()), TESForm, EffectSetting);
-			effects.push_back(effect);
-			durations.push_back((UInt32)jMagicEffect["duration"].asInt());
-			areas.push_back((UInt32)jMagicEffect["area"].asInt());
-			magnitudes.push_back((float)jMagicEffect["magnitude"].asFloat());
-			effectNum++;
-		}
-		CreateEnchantmentFromVectors(thisForm, newBEL, maxCharge, effects, magnitudes, areas, durations);
+	if (jBaseExtraData["enchantment"].isObject() && jBaseExtraData["itemMaxCharge"].isNumeric()) {
+		CreateEnchantmentFromJson(thisForm, newBEL, jBaseExtraData["itemMaxCharge"].asFloat(), jBaseExtraData["enchantment"]);
 	}
 	if (jBaseExtraData["itemCharge"].isNumeric())
 		referenceUtils::SetItemCharge(thisForm, newBEL, jBaseExtraData["itemCharge"].asFloat());
