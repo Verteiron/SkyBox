@@ -28,7 +28,7 @@ struct InterfaceExchangeMessage
 {
 	enum
 	{
-		kMessage_ExchangeInterface = 0
+		kMessage_ExchangeInterface = 0x9E3779B9
 	};
 
 	IInterfaceMap * interfaceMap = NULL;
