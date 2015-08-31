@@ -518,8 +518,12 @@ BaseExtraList * CreateBaseExtraListFromJson(TESForm* thisForm, Json::Value jBase
 			referenceUtils::SetDisplayName(newBEL, displayName.c_str(), false);
 	}
 
-	if (jBaseExtraData["enchantment"].isObject() && jBaseExtraData["itemMaxCharge"].isNumeric()) {
-		CreateEnchantmentFromJson(thisForm, newBEL, jBaseExtraData["itemMaxCharge"].asFloat(), jBaseExtraData["enchantment"]);
+	if (jBaseExtraData["enchantment"].isObject()) {
+		//Armors don't have maxcharge, so provide a default.
+		float itemMaxCharge = 0xffff;
+		if (jBaseExtraData["itemMaxCharge"].isNumeric())
+			itemMaxCharge = jBaseExtraData["itemMaxCharge"].asFloat();
+		CreateEnchantmentFromJson(thisForm, newBEL, itemMaxCharge, jBaseExtraData["enchantment"]);
 	}
 	if (jBaseExtraData["itemCharge"].isNumeric())
 		referenceUtils::SetItemCharge(thisForm, newBEL, jBaseExtraData["itemCharge"].asFloat());
