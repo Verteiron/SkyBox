@@ -4,10 +4,8 @@
 
 #include "skse/GameData.h"
 #include "skse/GameRTTI.h"
-#include "skse/GameExtraData.h"
 
 #include "skse/PapyrusWornObject.h"
-#include "skse/PapyrusSKSE.h"
 #include "skse/PapyrusSpell.h"
 
 #include "json/json.h"
@@ -165,6 +163,43 @@ Json::Value GetExtraDataJSON(TESForm* form, BaseExtraList* bel)
 				jBaseExtraList["itemCharge"] = referenceUtils::GetItemCharge(form, bel);
 			}
 		}
+
+		//Support for NIOverride dyes
+		if (g_itemDataInterface && (bel->HasType(kExtraData_Rank) || bel->HasType(kExtraData_UniqueID))) {
+			Json::Value jDyeColors;
+
+			ExtraRank* xRank = static_cast<ExtraRank*>(bel->GetByType(kExtraData_Rank));
+			ExtraUniqueID* xUID = static_cast<ExtraUniqueID*>(bel->GetByType(kExtraData_UniqueID));
+			SInt32 rankID = 0;
+			UInt16 uniqueID = 0;
+			if (xRank)
+				rankID = xRank->rank;
+			if (xUID)
+				uniqueID = xUID->uniqueId;
+
+			_DMESSAGE("RankID is %d, UniqueID is %d", rankID, uniqueID);
+			
+			//TESForm* uniqueForm = g_itemDataInterface->GetFormFromUniqueID(uniqueID);
+			//TESForm* ownerForm = g_itemDataInterface->GetOwnerOfUniqueID(uniqueID);
+
+			UInt32 iInvalidDyeEntry = g_itemDataInterface->GetItemDyeColor(uniqueID, 16); //Mask 16 is never used, so pull its value to get the "undyed" value (which changes every time)
+			std::vector<UInt32> dyes;
+			for (int i = 0; i < 15; i++) {
+				UInt32 dyeColor = g_itemDataInterface->GetItemDyeColor(uniqueID, i);
+				if (dyeColor == iInvalidDyeEntry)
+					dyeColor = 0;
+				dyes.push_back(dyeColor);
+				if (dyeColor && (dyeColor != iInvalidDyeEntry))
+					_DMESSAGE("DyeColor for mask %d is 0x%08X (R:%02X G:%02X B:%02X A:%02X)", i, dyeColor, (dyeColor & 0xFF0000) >> 16, (dyeColor & 0xFF00) >> 8, dyeColor & 0xFF, dyeColor >> 24);
+			}
+			while (dyes.size() && (!dyes.back()))
+				dyes.pop_back();
+			for (int i = 0; i < dyes.size(); i++) {
+				jDyeColors.append(Json::UInt(dyes[i]));
+			}
+			if (!jDyeColors.empty())
+				jBaseExtraList["NIODyeColors"] = jDyeColors;
+		}
 	}
 
 	if (bel->HasType(kExtraData_Soul)) {
@@ -197,11 +232,6 @@ Json::Value GetExtraDataJSON(TESForm* form, BaseExtraList* bel)
 		WriteItemData(form, fileData);
 	}
 
-	/*for (UInt32 i = 1; i < 0xB3; i++) {
-	if (bel->HasType(i))
-	_DMESSAGE("BaseExtraList has type: %0x", i);
-	}*/
-
 	return jBaseExtraList;
 }
 
@@ -213,7 +243,9 @@ bool IsWorthLoading(Json::Value jBaseExtraData)
 	return (jBaseExtraData["displayName"].isString()
 		|| jBaseExtraData["enchantment"].isObject()
 		|| jBaseExtraData["itemCharge"].isNumeric()
-		|| jBaseExtraData["soulSize"].isNumeric());
+		|| jBaseExtraData["soulSize"].isNumeric()
+		|| jBaseExtraData["rank"].isNumeric()
+		|| jBaseExtraData["uniqueID"].isNumeric());
 }
 
 bool IsWorthSaving(BaseExtraList * bel) 
@@ -222,10 +254,16 @@ bool IsWorthSaving(BaseExtraList * bel)
 	{
 		return false;
 	}
+	for (UInt32 i = 1; i < 0xB3; i++) {
+		if (bel->HasType(i))
+			_DMESSAGE("BaseExtraList has type: %0x", i);
+	}
 	return (bel->HasType(kExtraData_Health)
 		||  bel->HasType(kExtraData_Enchantment)
 		||  bel->HasType(kExtraData_Charge)
-		||  bel->HasType(kExtraData_Soul));
+		||  bel->HasType(kExtraData_Soul)
+		||  bel->HasType(kExtraData_Rank)
+		||  bel->HasType(kExtraData_UniqueID));
 }
 
 //Removes (Fine), (Flawless), (Legendary) etc. Will also remove (foo).
