@@ -92,7 +92,7 @@ SInt32 ssRotateFile(const std::string& filename, SInt32 maxCount)
 		return ret;
 
 	char sourcePath[MAX_PATH];
-	sprintf_s(sourcePath, "%s", filename);
+	sprintf_s(sourcePath, "%s", filename.data());
 
 	char drive[_MAX_DRIVE];
 	char dir[_MAX_DIR];
