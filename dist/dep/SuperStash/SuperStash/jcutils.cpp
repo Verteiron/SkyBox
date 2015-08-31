@@ -54,6 +54,7 @@ std::string GetJCFormString(TESForm * form)
 	{
 		return NULL;
 	}
+	
 	const char * modName = nullptr;
 
 	UInt8 modIndex = form->formID >> 24;

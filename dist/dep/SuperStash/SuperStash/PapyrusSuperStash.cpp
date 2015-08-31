@@ -276,11 +276,13 @@ Json::Value _GetItemJSON(TESForm * form, InventoryEntryData * entryData = NULL, 
 	
 	formData["form"] = GetJCFormString(form);
 	//formData["formID"] = (Json::UInt)form->formID;
-	
+	const char * formName = NULL;
 	TESFullName* pFullName = DYNAMIC_CAST(form, TESForm, TESFullName);
-	formData["name"] = pFullName->name.data;
+	if (pFullName)
+		formName = pFullName->name.data;
+	formData["name"] = formName ? formName : "";
 
-	//_DMESSAGE("Processing %s - %08x ==---", pFullName->name.data, form->formID);
+	_DMESSAGE("Processing %s - %08x ==---", formName, form->formID);
 
 	//Get potion data for player-made potions
 	if (form->formType == AlchemyItem::kTypeID && IsPlayerPotion(form)) {
@@ -585,6 +587,19 @@ SInt32 FillContainerFromJson(TESObjectREFR* pContainerRef, Json::Value jContaine
 
 	for (auto & jEntryData : jEntryDataList) {
 		TESForm * thisForm = GetJCStringForm(jEntryData["form"].asString());
+		if (thisForm && (thisForm->formID >> 24 == 0xff)) {
+			//This is a temporary form and should be sanity-checked, since these are not synced between saves.
+			TESFullName* pFullName = DYNAMIC_CAST(thisForm, TESForm, TESFullName);
+			if (!pFullName) {
+				thisForm = nullptr;
+			}
+			else {
+				if (jEntryData["name"].isString()) {
+					if (pFullName->name.data != jEntryData["name"].asString().c_str())
+						thisForm = nullptr;
+				}
+			}
+		}
 		if (!thisForm) {
 			Json::Value jPotionData = jEntryData["potionData"];
 			if (!jPotionData.empty()) {
