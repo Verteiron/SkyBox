@@ -135,6 +135,59 @@ void CreateEnchantmentFromJson(TESForm* form, BaseExtraList* bel, float maxCharg
 	CreateEnchantmentFromVectors(form, bel, maxCharge, effects, magnitudes, areas, durations);
 }
 
+void AddNIODyeData(TESForm* form, BaseExtraList* bel, Json::Value &jBaseExtraList)
+{
+	if (g_itemDataInterface && (bel->HasType(kExtraData_Rank) || bel->HasType(kExtraData_UniqueID))) {
+		Json::Value jDyeColors;
+
+		ExtraRank* xRank = static_cast<ExtraRank*>(bel->GetByType(kExtraData_Rank));
+		ExtraUniqueID* xUID = static_cast<ExtraUniqueID*>(bel->GetByType(kExtraData_UniqueID));
+		SInt32 rankID = 0;
+		UInt16 uniqueID = 0;
+		if (xRank)
+			rankID = xRank->rank;
+		if (xUID)
+			uniqueID = xUID->uniqueId;
+
+		_DMESSAGE("RankID is %d, UniqueID is %d", rankID, uniqueID);
+
+		TESForm* uniqueForm = g_itemDataInterface->GetFormFromUniqueID(uniqueID);
+		//TESForm* ownerForm = g_itemDataInterface->GetOwnerOfUniqueID(uniqueID);
+		if (!uniqueForm) {
+			int i = 0;
+			while (uniqueForm != form && i < 0x32) {
+				uniqueForm = g_itemDataInterface->GetFormFromUniqueID(i);
+				i++;
+			}
+			if (uniqueForm == form)
+				uniqueID = i;
+		}
+
+		UInt32 iInvalidDyeEntry = g_itemDataInterface->GetItemDyeColor(uniqueID, 16); //Mask 16 is never used, so pull its value to get the "undyed" value (which changes every time)
+		std::vector<UInt32> dyes;
+		_DMESSAGE("dyes size is %d", dyes.size());
+		bool hasDye = false;
+		for (int i = 15; i >= 0; i--) {
+			UInt32 dyeColor = g_itemDataInterface->GetItemDyeColor(uniqueID, i);
+			if (dyeColor == iInvalidDyeEntry)
+				dyeColor = 0;
+			if (dyeColor)
+				hasDye = true;
+			if (hasDye)
+				dyes.insert(dyes.begin(), dyeColor);
+			if (dyeColor && (dyeColor != iInvalidDyeEntry))
+				_DMESSAGE("DyeColor for mask %d is 0x%08X (R:%02X G:%02X B:%02X A:%02X)", i, dyeColor, (dyeColor & 0xFF0000) >> 16, (dyeColor & 0xFF00) >> 8, dyeColor & 0xFF, dyeColor >> 24);
+		}
+		if (hasDye) {
+			for (int i = 0; i < dyes.size(); i++) {
+				jDyeColors.append(Json::UInt(dyes[i]));
+			}
+			if (!jDyeColors.empty())
+				jBaseExtraList["NIODyeColors"] = jDyeColors;
+		}
+	}
+}
+
 Json::Value GetExtraDataJSON(TESForm* form, BaseExtraList* bel)
 {
 	Json::Value jBaseExtraList;
@@ -142,10 +195,13 @@ Json::Value GetExtraDataJSON(TESForm* form, BaseExtraList* bel)
 	if (!form || !bel)
 		return jBaseExtraList;
 
+	const char * sFormName = NULL;
 	TESFullName* pFullName = DYNAMIC_CAST(form, TESForm, TESFullName);
+	if (pFullName)
+		sFormName = pFullName->name.data;
 	const char * sDisplayName = bel->GetDisplayName(form);
 
-	if (sDisplayName && (sDisplayName != pFullName->name.data)) {
+	if (sDisplayName && (sDisplayName != sFormName)) {
 		jBaseExtraList["displayName"] = sDisplayName;
 		UInt32 itemID = ssCalcItemId(form, bel); //ItemID as used by WornObject and SkyUI, might be useful
 		if (itemID)
@@ -165,41 +221,7 @@ Json::Value GetExtraDataJSON(TESForm* form, BaseExtraList* bel)
 		}
 
 		//Support for NIOverride dyes
-		if (g_itemDataInterface && (bel->HasType(kExtraData_Rank) || bel->HasType(kExtraData_UniqueID))) {
-			Json::Value jDyeColors;
-
-			ExtraRank* xRank = static_cast<ExtraRank*>(bel->GetByType(kExtraData_Rank));
-			ExtraUniqueID* xUID = static_cast<ExtraUniqueID*>(bel->GetByType(kExtraData_UniqueID));
-			SInt32 rankID = 0;
-			UInt16 uniqueID = 0;
-			if (xRank)
-				rankID = xRank->rank;
-			if (xUID)
-				uniqueID = xUID->uniqueId;
-
-			_DMESSAGE("RankID is %d, UniqueID is %d", rankID, uniqueID);
-			
-			//TESForm* uniqueForm = g_itemDataInterface->GetFormFromUniqueID(uniqueID);
-			//TESForm* ownerForm = g_itemDataInterface->GetOwnerOfUniqueID(uniqueID);
-
-			UInt32 iInvalidDyeEntry = g_itemDataInterface->GetItemDyeColor(uniqueID, 16); //Mask 16 is never used, so pull its value to get the "undyed" value (which changes every time)
-			std::vector<UInt32> dyes;
-			for (int i = 0; i < 15; i++) {
-				UInt32 dyeColor = g_itemDataInterface->GetItemDyeColor(uniqueID, i);
-				if (dyeColor == iInvalidDyeEntry)
-					dyeColor = 0;
-				dyes.push_back(dyeColor);
-				if (dyeColor && (dyeColor != iInvalidDyeEntry))
-					_DMESSAGE("DyeColor for mask %d is 0x%08X (R:%02X G:%02X B:%02X A:%02X)", i, dyeColor, (dyeColor & 0xFF0000) >> 16, (dyeColor & 0xFF00) >> 8, dyeColor & 0xFF, dyeColor >> 24);
-			}
-			while (dyes.size() && (!dyes.back()))
-				dyes.pop_back();
-			for (int i = 0; i < dyes.size(); i++) {
-				jDyeColors.append(Json::UInt(dyes[i]));
-			}
-			if (!jDyeColors.empty())
-				jBaseExtraList["NIODyeColors"] = jDyeColors;
-		}
+		AddNIODyeData(form, bel, jBaseExtraList);
 	}
 
 	if (bel->HasType(kExtraData_Soul)) {

@@ -5,8 +5,8 @@
 #include "skse/SafeWrite.h"
 #include "skse/GameAPI.h"
 
-#include "PapyrusSuperStash.h"
 #include "jcutils.h"
+#include "PapyrusSuperStash.h"
 
 IDebugLog	gLog;
 
@@ -56,7 +56,7 @@ extern "C"
 				}
 			}
 			if (message.interfaceMap) {
-				g_itemDataInterface = (ItemDataInterface*)message.interfaceMap->QueryInterface("ItemData");
+				g_itemDataInterface = static_cast<ItemDataInterface*>(message.interfaceMap->QueryInterface("ItemData"));
 				if (g_itemDataInterface) {
 					_MESSAGE("Got ItemDataInterface!");
 				}
