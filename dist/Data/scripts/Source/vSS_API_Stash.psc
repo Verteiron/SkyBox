@@ -311,10 +311,10 @@ Int Function ImportStashItems(ObjectReference akStashRef) Global
 		Return 0
 	EndIf
 
-	If GetStashInt(akStashRef,"Busy")
-		DebugTraceAPIStash("Error! " + akStashRef + " is busy!")
-		Return 0
-	EndIf
+	; If GetStashInt(akStashRef,"Busy")
+	; 	DebugTraceAPIStash("Error! " + akStashRef + " is busy!")
+	; 	Return 0
+	; EndIf
 	
 	Int iDataSerial = GetStashInt(akStashRef,"DataSerial")
 	Int iStashSerial = GetStashSessionInt(akStashRef,"DataSerial")
