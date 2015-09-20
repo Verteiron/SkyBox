@@ -82,7 +82,18 @@ Event OnStashOpen()
 	EndIf
 	_kGlow = _SelfRef.PlaceAtMe(dunKagrenzelFXActivator, abInitiallyDisabled = True)
 	_kGlow.MoveTo(_SelfRef,0,0,_SelfRef.GetHeight() * 0.6)
-	_kGlow.SetScale(5)
+	Float fW = _SelfRef.GetWidth()
+	Float fH = _SelfRef.GetHeight()
+	Float fL = _SelfRef.GetLength()
+	Float fSize = fW
+	If fH > fSize
+		fSize = fH
+	EndIf
+	If fL > fSize
+		fSize = fL
+	EndIf
+	Float fScale = fSize / 18.0
+	_kGlow.SetScale(fScale)
 	_kGlow.EnableNoWait(True)
 	Utility.WaitMenuMode(1)
 	While UI.IsMenuOpen("ContainerMenu")
