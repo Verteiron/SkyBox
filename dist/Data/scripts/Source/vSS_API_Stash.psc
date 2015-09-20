@@ -161,7 +161,6 @@ Bool Function CreateStash(ObjectReference akStashRef, Int aiStashGroup = 0) Glob
 		Return False
 	EndIf
 	If akStashRef.GetType() == 28 || akStashRef.GetBaseObject().GetType() == 28 ;kContainer
-		SetStashObj(akStashRef,"Items",JArray.Object())
 		SetStashGroup(akStashRef,aiStashGroup)
 		Return True
 	Else
@@ -213,7 +212,7 @@ Int Function LoadStashesForCell(Cell akCell) Global
 		If IsStash(kContainer)
 			DebugTraceAPIStash("Found Stash " + kContainer + "!")
 			
-			Int iCount = ImportStashItems_new(kContainer)
+			Int iCount = ImportStashItems(kContainer)
 			;String sFilePath = SuperStash.userDirectory() + "Stashes\\player.json"
 			
 			;Int iCount = SuperStash.FillContainerFromJSON(kContainer,sFilePath)
@@ -224,7 +223,7 @@ Int Function LoadStashesForCell(Cell akCell) Global
 	Return i
 EndFunction
 
-Int Function ImportStashItems_new(ObjectReference akStashRef) Global
+Int Function ImportStashItems(ObjectReference akStashRef) Global
 	If !IsStash(akStashRef)
 		DebugTraceAPIStash("Error! " + akStashRef + " is not a valid Stash!")
 		Return 0
@@ -235,181 +234,19 @@ Int Function ImportStashItems_new(ObjectReference akStashRef) Global
 	ObjectReference kMoveTarget 		= StashManager.MoveTarget
 	ObjectReference kContainerTarget 	= StashManager.ContainerTarget
 
-	String sStashID  = GetFormIDString(akStashRef)
-	String sFilePath = SuperStash.userDirectory() + "Stashes\\player.json"
-
+	String sStashID  = SuperStash.GetStashNameString(akStashRef)
+	String sFilePath = SuperStash.userDirectory() + "Stashes\\" ;"; <-- fix for highlighting in SublimePapyrus
+	sFilePath += sStashID + ".json" 
 
 	;Create ExtraContainerChanges data for Container
 	Form kGold = Game.GetFormFromFile(0xf,"Skyrim.esm")
 	akStashRef.AddItem(kGold, 1, True)
 	akStashRef.RemoveItem(kGold, 1, True)
+
+	DebugTraceAPIStash("Filling " + akStashRef + " from " + sFilePath + "!")
+	
 	;This very quickly fills the container with all the base forms
-	return SuperStash.FillContainerFromJson(akStashRef,sFilePath)
-
-	Int jContainerState 	= JValue.readFromFile(sFilePath)
-	Int jContainerEntries 	= JMap.GetObj(jContainerState,"containerEntries")
-	Int jEntryDataList 		= JMap.GetObj(jContainerState,"entryDataList")
-	JValue.AddToPool(jContainerState,"vSS_Stash_" + sStashID)
-	JValue.AddToPool(jContainerEntries,"vSS_Stash_" + sStashID)
-	JValue.AddToPool(jEntryDataList,"vSS_Stash_" + sStashID)
-	
-	Int iCustomCount = 0
-	Int i = JArray.Count(jEntryDataList)
-	While i > 0
-		i -= 1
-		Int jInventoryEntryData = JArray.GetObj(jEntryDataList,i)
-		If JValue.HasPath(jInventoryEntryData,".extendDataList")
-			Form kForm = JMap.GetForm(jInventoryEntryData,"form")
-			Int iCount = JMap.GetInt(jInventoryEntryData,"count")
-			If kForm && iCount
-				Int jExtendDataList = JMap.GetObj(jInventoryEntryData,"extendDataList")
-				If JValue.IsArray(jExtendDataList)
-					Int n = JArray.Count(jExtendDataList)
-					While n > 0
-						n -= 1
-						Int jBaseExtraData = JArray.GetObj(jExtendDataList,n)
-						;Int jObjectData = JValue.DeepCopy(jBaseExtraData)
-						;JMap.SetForm(jObjectData,"form",kForm)
-						
-						akStashRef.RemoveItem(kForm,1,True,kContainerTarget)
-						ObjectReference kObject = kContainerTarget.DropObject(kForm, 1)
-						If kObject
-							Int x = 1
-							If JMap.HasKey(jBaseExtraData,"count")
-								x = JMap.GetInt(jBaseExtraData,"count")
-							EndIf
-							While x > 0
-								x -= 1
-								vSS_API_Item.CustomizeObjectFromJObj(jBaseExtraData,kObject)
-								kContainerTemp.AddItem(kObject)
-								;DebugTraceAPIStash("Customized " + kObject + " (" + kObject.GetDisplayName() + ")!")
-								iCustomCount += 1
-							EndWhile
-						EndIf
-					EndWhile
-				EndIf
-				kContainerTemp.RemoveAllItems(akStashRef)
-			EndIf
-		ElseIf JValue.HasPath(jInventoryEntryData,".potionData")
-			Int iCount = JMap.GetInt(jInventoryEntryData,"count")
-			Int jPotionData = JValue.SolveObj(jInventoryEntryData,".potionData")
-			Potion kPotion = vSS_API_Item.CreatePotionFromPotionData(jPotionData)
-			;DebugTraceAPIStash("Potion created from PotionData is " + kPotion + " (" + kPotion.GetName() + ")!")
-			If kPotion
-				akStashRef.AddItem(kPotion,iCount,True)
-			EndIf
-		EndIf
-	EndWhile
-
-	JValue.CleanPool("vSS_Stash_" + sStashID)
-	Return iCustomCount
-EndFunction
-
-Int Function ImportStashItems(ObjectReference akStashRef) Global
-	If !IsStash(akStashRef)
-		DebugTraceAPIStash("Error! " + akStashRef + " is not a valid Stash!")
-		Return 0
-	EndIf
-
-	; If GetStashInt(akStashRef,"Busy")
-	; 	DebugTraceAPIStash("Error! " + akStashRef + " is busy!")
-	; 	Return 0
-	; EndIf
-	
-	Int iDataSerial = GetStashInt(akStashRef,"DataSerial")
-	Int iStashSerial = GetStashSessionInt(akStashRef,"DataSerial")
-
-	If iDataSerial == iStashSerial
-		DebugTraceAPIStash(akStashRef + " is already up to date!")
-		Return 0
-	EndIf
-
-	SetStashInt(akStashRef,"Busy",1)
-
-	vSS_StashManager StashManager = Quest.GetQuest("vSS_StashManagerQuest") as vSS_StashManager
-
-	String sSessionID = GetSessionStr("SessionID")
-	Float fSessionTime = Game.GetRealHoursPassed()
-
-	ObjectReference kMoveTarget 		= StashManager.MoveTarget
-	ObjectReference kContainerTarget 	= StashManager.ContainerTarget
-
-	EffectShader    kContainerShader 	= StashManager.ContainerFXShader
-
-	Int iOriginalItemCount = akStashRef.GetContainerForms().Length
-
-	Int jItemList = GetStashObj(akStashRef,"Items")
-	If !jItemList
-		DebugTraceAPIStash("Error! " + akStashRef + " is missing its ItemList!")
-		SetStashInt(akStashRef,"Busy",0)
-		Return 0
-	EndIf
-
-	akStashRef.BlockActivation(True)
-	kContainerShader.Play(akStashRef)
-
-	Int i = JArray.Count(jItemList)
-	DebugTraceAPIStash("Importing " + i + " items for " + akStashRef + "...")
-	While i > 0
-		i -= 1
-		Int jItemMap = JArray.GetObj(jItemList,i)
-		String sItemID = JMap.GetStr(jItemMap,"UUID")
-		;Int iItemSerial = JMap.GetInt(jItemMap,"DataSerial")
-		; If sSessionID == JMap.GetStr(jItemMap,"SessionID") && fSessionTime <= JMap.GetFlt(jItemMap,"SessionTime")
-		; 	DebugTraceAPIStash("Error! " + akStashRef + " - Item's session/timestamp indicates same-session duplication could occur! Item: " + JMap.GetStr(jItemMap,"DisplayName") + " (" + sItemID + ")!")
-		; EndIf
-		If sItemID 
-			;Check if this item has already been created in this Session
-			DebugTraceAPIStash("Checking custom item " + JMap.GetStr(jItemMap,"DisplayName") + "...")
-			ObjectReference kObject = vSS_API_Item.GetExistingObject(sItemID) as ObjectReference
-			If kObject
-				DebugTraceAPIStash(JMap.GetStr(jItemMap,"DisplayName") + " (" + sItemID + ") has already been created in this Session!")
-				If akStashRef.GetItemCount(kObject)
-					akStashRef.RemoveItem(kObject,1,True,kContainerTarget)
-					DebugTraceAPIStash("... and it's already in this Stash object!")
-				EndIf
-			Else ;Item has not been created in this Session
-				DebugTraceAPIStash("Item " + JMap.GetStr(jItemMap,"DisplayName") + " doesn't exist in this session, recreating it...")
-				kObject = vSS_API_Item.CreateObject(sItemID)
-				If kObject
-					kContainerTarget.AddItem(kObject, 1, True)
-					DebugTraceAPIStash("Success!")
-				Else
-					DebugTraceAPIStash("Error! " + akStashRef + " could not recreate item " + JMap.GetStr(jItemMap,"DisplayName") + " (" + sItemID + ")!")
-				EndIf
-			EndIf
-		Else
-			Form kItem = JMap.GetForm(jItemMap,"Form")
-			DebugTraceAPIStash("Checking item " + kItem + " (" + JMap.GetInt(jItemMap,"Count") + ")...")
-			If kItem 
-				kContainerTarget.AddItem(kItem, JMap.GetInt(jItemMap,"Count"), abSilent = True)
-				; Int iLocalItemCount = akStashRef.GetItemCount(kItem)
-				; Int iSavedItemCount = JMap.GetInt(jItemMap,"Count")
-				; If iLocalItemCount > iSavedItemCount
-				; 	akStashRef.RemoveItem(kItem, iLocalItemCount - iSavedItemCount, abSilent = True)
-				; ElseIf iLocalItemCount < iSavedItemCount
-				; 	kContainerTarget.AddItem(kItem, iSavedItemCount - iLocalItemCount, abSilent = True)
-				; EndIf
-			Else
-				DebugTraceAPIStash("Error! " + akStashRef + " could not load a form!")
-			EndIf
-		EndIf
-	EndWhile
-
-	akStashRef.RemoveAllItems()
-	kContainerTarget.RemoveAllItems(akStashRef)
-
-	SetStashSessionInt(akStashRef,"DataSerial",iDataSerial)
-	SetStashInt(akStashRef,"Busy",0)
-	
-	;If iOriginalItemCount > 0 ;&& iOriginalItemCount != akStashRef.GetContainerForms().Length
-		;ExportStashItems(akStashRef)
-	;EndIf
-
-	kContainerShader.Stop(akStashRef)
-	akStashRef.BlockActivation(False)
-
-	Return JArray.Count(jItemList)
+	Return SuperStash.FillContainerFromJson(akStashRef,sFilePath)
 
 EndFunction
 
@@ -445,8 +282,10 @@ Int Function _CreateItemMap(ObjectReference akStashRef, ObjectReference akMoveTa
 EndFunction
 
 ;For anyone reading this, I had this whole scan working perfectly in pure Papyrus. It was beautiful.
-;It was also mind-numbingly slow, even using multiple threads, so I learned c++ well enough to 
-;reimplement it in an SKSE plugin. Now it's nearly instantaneous. So it goes.
+;It used several containers working in parallel to sort and scan everything. For Papyrus, it was 
+;blindingly fast. By any realistic standard, though, it was also mind-numbingly slow. Call it a 
+;moral victory. At any rate, I gave up on doing it in pure Papyris and instead learned c++ well 
+;enough to reimplement it in an SKSE plugin. Now it's nearly instantaneous. So it goes.
 Int Function ScanContainer(ObjectReference akStashRef) Global
 	DebugTraceAPIStash("=== Starting scan of " + akStashRef + " ===--")
 	vSS_StashManager StashManager = Quest.GetQuest("vSS_StashManagerQuest") as vSS_StashManager
@@ -555,18 +394,28 @@ Int Function ExportStashItems(ObjectReference akStashRef) Global
 
 	kContainerShader.Play(akStashRef)
 
-	String sStashID = GetFormIDString(akStashRef)
+	String sStashID = SuperStash.GetStashNameString(akStashRef)
 
 	Int jStashState = ScanContainer(akStashRef)
 
-	Int iEntryCount = JArray.Count(jStashState)
+	Int iEntryCount = JArray.Count(JMap.GetObj(jStashState,"containerEntries")) + JArray.Count(JMap.GetObj(jStashState,"entryDataList"))
 	
 	DebugTraceAPIStash("Updated Stash " + akStashRef + ", found " + iEntryCount + " entries!")
 
 	SetStashInt(akStashRef,"DataSerial",iDataSerial)
 	SetStashSessionInt(akStashRef,"DataSerial",iDataSerial)
-	
-	SetStashObj(akStashRef,"ContainerState",jStashState)
+
+	Int jKeyList = JMap.AllKeys(jStashState)
+	Int i = JArray.Count(jKeyList)
+	While i > 0
+		i -= 1
+		String sKey = JArray.GetStr(jKeyList,i)
+		If sKey
+			SetStashObj(akStashRef,sKey,JMap.GetObj(jStashState,sKey))
+		EndIf
+	EndWhile
+
+	;SetStashObj(akStashRef,"ContainerState",jStashState)
 	SetStashStr(akStashRef,"LastSessionID",sSessionID)
 	SetStashFlt(akStashRef,"LastSessionTime",fSessionTime)
 
