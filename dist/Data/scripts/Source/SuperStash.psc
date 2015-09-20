@@ -44,11 +44,20 @@ Potion Function CreateCustomPotion(MagicEffect[] effects, float[] magnitudes, in
 
 ; Other useful functions
 
-String Function GetFormIDString(Form kForm) Global
+String Function GetFormIDString(Form akForm) Global
 	String sResult
-	sResult = kForm as String ; [FormName < (FF000000)>]
+	sResult = akForm as String ; [FormName < (FF000000)>]
 	sResult = StringUtil.SubString(sResult,StringUtil.Find(sResult,"(") + 1,8)
 	Return sResult
+EndFunction
+
+String Function GetStashNameString(ObjectReference akStashRef) Global
+	String sModName = GetSourceMod(akStashRef)
+	If sModName
+		Return sModName + "_" + GetFormIDString(akStashRef)
+	Else
+		Return GetFormIDString(akStashRef)
+	EndIf
 EndFunction
 
 Function StartTimer(String sTimerLabel) Global
