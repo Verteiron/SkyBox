@@ -84,7 +84,7 @@ Event OnStashOpen()
 	_kGlow.MoveTo(_SelfRef,0,0,_SelfRef.GetHeight() * 0.6)
 	_kGlow.SetScale(5)
 	_kGlow.EnableNoWait(True)
-	Utility.Wait(1)
+	Utility.WaitMenuMode(1)
 	While UI.IsMenuOpen("ContainerMenu")
 		Utility.Wait(0.2)
 	EndWhile

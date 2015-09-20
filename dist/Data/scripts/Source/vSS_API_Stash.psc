@@ -161,6 +161,8 @@ Bool Function CreateStash(ObjectReference akStashRef, Int aiStashGroup = 0) Glob
 		Return False
 	EndIf
 	If akStashRef.GetType() == 28 || akStashRef.GetBaseObject().GetType() == 28 ;kContainer
+		SetStashInt(akStashRef,"DataSerial",0)
+		SetStashSessionInt(akStashRef,"DataSerial",0)
 		SetStashGroup(akStashRef,aiStashGroup)
 		Return True
 	Else
