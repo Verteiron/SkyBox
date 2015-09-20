@@ -78,6 +78,7 @@ TESForm* GetJCStringForm(std::string formString)
 	TESForm * result = nullptr;
 
 	// If JContainers is around, use it to get the form. Otherwise use our own method.
+	/* Removing this for now as it causes crashes 
 	if (JCAvailable()) {
 		//Turn the string into a single-item JSON array, then get JContainers to retrieve the form.
 		std::string formArrayString("[ \"" + formString + "\" ]");
@@ -87,6 +88,7 @@ TESForm* GetJCStringForm(std::string formString)
 
 		return result;
 	}
+	*/
 	// The following works without JContainers, but is nasty and may break in future versions
 
 	std::vector<std::string> stringData;
