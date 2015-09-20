@@ -393,7 +393,7 @@ Int Function ExportStashItems(ObjectReference akStashRef) Global
 	vSS_StashManager StashManager = Quest.GetQuest("vSS_StashManagerQuest") as vSS_StashManager
 
 	EffectShader    kContainerShader 	= StashManager.ContainerFXShader
-
+	kContainerShader.Stop(akStashRef)
 	kContainerShader.Play(akStashRef)
 
 	String sStashID = SuperStash.GetStashNameString(akStashRef)
@@ -421,7 +421,7 @@ Int Function ExportStashItems(ObjectReference akStashRef) Global
 	SetStashStr(akStashRef,"LastSessionID",sSessionID)
 	SetStashFlt(akStashRef,"LastSessionTime",fSessionTime)
 
-	kContainerShader.Stop(akStashRef)
+	;kContainerShader.Stop(akStashRef)
 	akStashRef.BlockActivation(False)
 	SetStashInt(akStashRef,"Busy",0)
 

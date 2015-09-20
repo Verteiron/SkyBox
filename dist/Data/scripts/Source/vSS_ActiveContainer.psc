@@ -25,6 +25,8 @@ Sound 				Property 	vSS_StashDoneLPSM 			Auto
 
 Int _iThreadCount = 0
 
+Int _iSoundInstance = 0
+
 ObjectReference _SelfRef
 
 ObjectReference _kGlow
@@ -73,18 +75,49 @@ Event OnActivate(ObjectReference akActionRef)
 	DebugTrace("OnActivate(" + akActionRef + ")")
 EndEvent
 
+Event OnStashCreate()
+	DebugTrace("OnStashCreate()")
+	_SelfRef = Self.GetReference()
+	PlaceFX(_SelfRef)
+	If !vSS_API_Stash.IsStash(_SelfRef)
+		vSS_API_Stash.CreateStash(_SelfRef)
+	EndIf
+	PlayFX()
+	Int iCount = vSS_API_Stash.ExportStashItems(_SelfRef)
+	Clear()
+	StopFX()
+EndEvent
+
 Event OnStashOpen()
 	DebugTrace("OnStashOpen()")
 	_SelfRef = Self.GetReference()
 
 	If !vSS_API_Stash.IsStash(_SelfRef)
-		vSS_API_Stash.CreateStash(_SelfRef)
+		DebugTrace("Not a Stash!")
+		Return
+		;vSS_API_Stash.CreateStash(_SelfRef)
 	EndIf
-	_kGlow = _SelfRef.PlaceAtMe(dunKagrenzelFXActivator, abInitiallyDisabled = True)
-	_kGlow.MoveTo(_SelfRef,0,0,_SelfRef.GetHeight() * 0.6)
-	Float fW = _SelfRef.GetWidth()
-	Float fH = _SelfRef.GetHeight()
-	Float fL = _SelfRef.GetLength()
+	PlaceFX(_SelfRef)
+	Utility.WaitMenuMode(1)
+	While UI.IsMenuOpen("ContainerMenu")
+		Utility.Wait(0.2)
+	EndWhile
+	PlayFX()
+	Int iCount = vSS_API_Stash.ExportStashItems(_SelfRef)
+	Clear()
+	StopFX()
+EndEvent
+
+Function PlaceFX(ObjectReference akStashRef)
+	_kGlow = akStashRef.PlaceAtMe(dunKagrenzelFXActivator, abInitiallyDisabled = True)
+	If StringUtil.Find(akStashRef.GetBaseObject().GetName(),"sack") > -1
+		_kGlow.MoveTo(akStashRef,0,0,akStashRef.GetHeight() * 0.25)
+	Else
+		_kGlow.MoveTo(akStashRef,0,0,akStashRef.GetHeight() * 0.6)
+	EndIf
+	Float fW = akStashRef.GetWidth()
+	Float fH = akStashRef.GetHeight()
+	Float fL = akStashRef.GetLength()
 	Float fSize = fW
 	If fH > fSize
 		fSize = fH
@@ -95,20 +128,20 @@ Event OnStashOpen()
 	Float fScale = fSize / 18.0
 	_kGlow.SetScale(fScale)
 	_kGlow.EnableNoWait(True)
-	Utility.WaitMenuMode(1)
-	While UI.IsMenuOpen("ContainerMenu")
-		Utility.Wait(0.2)
-	EndWhile
-	Int iSoundInstance = vSS_StashDoneLPSM.Play(_SelfRef)
+	_iSoundInstance = vSS_StashDoneLPSM.Play(akStashRef)
+EndFunction
+
+Function PlayFX()
 	_kGlow.PlayGamebryoAnimation("mReady",abStartOver = False, afEaseInTime = 5.0)
-	Int iCount = vSS_API_Stash.ExportStashItems(_SelfRef)
+EndFunction
+
+Function StopFX()
 	_kGlow.PlayGamebryoAnimation("mCast")
-	Sound.StopInstance(iSoundInstance)
-	Clear()
+	Sound.StopInstance(_iSoundInstance)
 	WaitMenuMode(0.5)
 	_kGlow.Disable(True)
 	_kGlow.Delete()
-EndEvent
+EndFunction
 
 ; Event OnItemAdded(Form akBaseItem, int aiItemCount, ObjectReference akItemReference, ObjectReference akSourceContainer)
 ; 	_iThreadCount += 1

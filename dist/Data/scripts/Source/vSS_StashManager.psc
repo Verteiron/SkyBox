@@ -55,6 +55,8 @@ ObjectReference 	Property ContainerTarget 						Auto
 ObjectReference 	Property ContainerTemp	 						Auto
 ObjectReference 	Property MoveTarget		 						Auto
 
+Spell 				Property vSS_CreateStashSpell					Auto
+
 vSS_WeaponScanner[]	Property WeaponScanners							Auto
 
 EffectShader   		Property ContainerFXShader 						Auto
@@ -127,6 +129,11 @@ Function DoUpkeep(Bool bInBackground = True)
 	If !PlayerREF.HasPerk(vSS_StashCheckPerk)
 		DebugTrace("Adding vSS_StashCheckPerk to Player!")
 		PlayerREF.AddPerk(vSS_StashCheckPerk)
+	EndIf
+
+	If !PlayerREF.HasSpell(vSS_CreateStashSpell)
+		DebugTrace("Adding vSS_CreateStashSpell to Player!")
+		PlayerREF.AddSpell(vSS_CreateStashSpell,False)
 	EndIf
 
 	;UpgradeRegistryData()
