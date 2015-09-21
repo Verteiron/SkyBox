@@ -244,7 +244,6 @@ Bool Function CheckDependencies()
 	DebugTrace("SKSE is version " + fSKSE)
 	DebugTrace("JContainers is version " + SKSE.GetPluginVersion("Jcontainers") + ", API is " + JContainers.APIVersion())
 	DebugTrace("SuperStash is version " + SKSE.GetPluginVersion("SuperStash"))
-	DebugTrace("CharGen is version " + SKSE.GetPluginVersion("chargen"))
 	DebugTrace("NIOverride is version " + SKSE.GetPluginVersion("nioverride"))
 	;Debug.MessageBox("SKSE version is " + fSKSE)
 	If fSKSE < 1.0702
@@ -255,12 +254,6 @@ Bool Function CheckDependencies()
 	EndIf
 	If JContainers.APIVersion() < 3
 		Debug.MessageBox("SuperStash\nThis mod requires JContainers with API 3 (3.1.x), but it seems to be missing or out of date.\nThe mod will now shut down.")
-		Return False
-	Else
-		;Proceed
-	EndIf
-	If SKSE.GetPluginVersion("chargen") < 4
-		Debug.MessageBox("SuperStash\nThis mod requires RaceMenu 3.2.0 or higher, but it seems to be missing or out of date.\nThe mod will now shut down.")
 		Return False
 	Else
 		;Proceed
