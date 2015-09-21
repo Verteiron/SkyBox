@@ -4,7 +4,6 @@ Scriptname vSS_API_Stash extends vSS_APIBase Hidden
 ; === [ vSS_API_Stash.psc ] ===============================================---
 ; API for saving and loading Stashs. A Stash is a container that will be shared
 ; between multiple savegames/sessions.
-; 
 ; ========================================================---
 
 Import vSS_Registry
@@ -206,6 +205,8 @@ String[] Function GetStashItems(ObjectReference akStashRef) Global
 	Return sRet
 EndFunction
 
+;=== Stash object inventory Functions ===--
+
 Int Function LoadStashesForCell(Cell akCell) Global
 	Int iContainerCount = akCell.GetNumRefs(formTypeFilter = 28) ;kContainer
 	Int i = 0
@@ -232,9 +233,10 @@ Int Function ImportStashItems(ObjectReference akStashRef) Global
 	EndIf
 
 	vSS_StashManager StashManager 		= Quest.GetQuest("vSS_StashManagerQuest") as vSS_StashManager
-	ObjectReference kContainerTemp 		= StashManager.ContainerTemp
-	ObjectReference kMoveTarget 		= StashManager.MoveTarget
-	ObjectReference kContainerTarget 	= StashManager.ContainerTarget
+
+	EffectShader    kContainerShader 	= StashManager.ContainerFXShader
+	kContainerShader.Stop(akStashRef)
+	kContainerShader.Play(akStashRef)
 
 	String sStashID  = SuperStash.GetStashNameString(akStashRef)
 	String sFilePath = SuperStash.userDirectory() + "Stashes\\" ;"; <-- fix for highlighting in SublimePapyrus
@@ -252,41 +254,10 @@ Int Function ImportStashItems(ObjectReference akStashRef) Global
 
 EndFunction
 
-Int Function _CreateItemMap(ObjectReference akStashRef, ObjectReference akMoveTarget, ObjectReference akContainerTarget, Form akItem, Int aiItemCount, Int aiItemType) Global
-	Int jItemMap = 0
-	String sItemID = ""
-	If akItem as ObjectReference || aiItemType == 41 || aiItemType == 26 ; Weapon or Armor
-		If akItem as ObjectReference
-			DebugTraceAPIStash(akItem + " is an ObjectReference!")
-			(akItem as ObjectReference).MoveTo(akMoveTarget)
-			sItemID = vSS_API_Item.SerializeObject(akItem as ObjectReference)
-			akStashRef.AddItem((akItem as ObjectReference),abSilent = True)
-		ElseIf aiItemType == 41 || aiItemType == 26 ; Weapon or Armor
-			DebugTraceAPIStash(akItem + " is a Weapon or Armor!")
-			akStashRef.RemoveItem(akItem,1,True,akContainerTarget)
-			ObjectReference kObject = akContainerTarget.DropObject(akItem, 1)
-			sItemID = vSS_API_Item.GetObjectID(kObject)
-			If !sItemID
-				sItemID = vSS_API_Item.SerializeObject(kObject)
-			EndIf
-			akStashRef.AddItem(kObject,abSilent = True)
-		EndIf
-	EndIf
-	If sItemID
-		jItemMap = vSS_API_Item.GetItemJMap(sItemID)
-	Else
-		jItemMap = JMap.Object()
-		JMap.SetForm(jItemMap,"Form",akItem)
-		JMap.SetInt(jItemMap,"Count",aiItemCount)
-	EndIf
-	
-	Return jItemMap
-EndFunction
-
 ;For anyone reading this, I had this whole scan working perfectly in pure Papyrus. It was beautiful.
 ;It used several containers working in parallel to sort and scan everything. For Papyrus, it was 
 ;blindingly fast. By any realistic standard, though, it was also mind-numbingly slow. Call it a 
-;moral victory. At any rate, I gave up on doing it in pure Papyris and instead learned c++ well 
+;moral victory. At any rate, I gave up on doing it in pure Papyrus and instead learned c++ well 
 ;enough to reimplement it in an SKSE plugin. Now it's nearly instantaneous. So it goes.
 Int Function ScanContainer(ObjectReference akStashRef) Global
 	DebugTraceAPIStash("=== Starting scan of " + akStashRef + " ===--")
@@ -297,77 +268,6 @@ Int Function ScanContainer(ObjectReference akStashRef) Global
 	
 	DebugTraceAPIStash("=== Finished scan of " + akStashRef + " ===--")
 	Return jContainerState
-EndFunction
-
-Function AddStashItem(ObjectReference akStashRef, Form akBaseItem, int aiItemCount, ObjectReference akItemReference = None) Global
-	Int jStashMap = GetStashSessionJMap(akStashRef)
-	Int jPending = JMap.GetObj(jStashMap,"Pending")
-	If !jPending
-		JMap.SetObj(jStashMap,"Pending",JFormMap.Object())
-		jPending = JMap.GetObj(jStashMap,"Pending")
-	EndIf
-	Form kItem = akBaseItem
-	If akItemReference
-		kItem = akItemReference
-	EndIf
-	JFormMap.SetInt(jPending,kItem,JFormMap.GetInt(jPending,kItem) + aiItemCount)
-	SaveSession()
-EndFunction
-
-Function RemoveStashItem(ObjectReference akStashRef, Form akBaseItem, int aiItemCount, ObjectReference akItemReference = None) Global
-	Int jStashMap = GetStashSessionJMap(akStashRef)
-	Int jPending = JMap.GetObj(jStashMap,"Pending")
-	If !jPending
-		JMap.SetObj(jStashMap,"Pending",JFormMap.Object())
-		jPending = JMap.GetObj(jStashMap,"Pending")
-	EndIf
-	Form kItem = akBaseItem
-	If akItemReference
-		kItem = akItemReference
-	EndIf
-	JFormMap.SetInt(jPending,kItem,JFormMap.GetInt(jPending,kItem) - aiItemCount)
-	SaveSession()
-EndFunction
-
-Int Function ProcessPending(ObjectReference akStashRef) Global
-	Int jStashMap = GetStashSessionJMap(akStashRef)
-	Int jPending = JMap.GetObj(jStashMap,"Pending")
-	If !jPending
-		Return 0
-	EndIf
-
-	Int iPendingCount = JFormMap.Count(jPending)
-
-	vSS_StashManager StashManager 		= Quest.GetQuest("vSS_StashManagerQuest") as vSS_StashManager
-	ObjectReference ContainerTemp 		= StashManager.ContainerTemp
-	ObjectReference kMoveTarget 		= StashManager.MoveTarget
-	ObjectReference kContainerTarget 	= StashManager.ContainerTarget
-
-	Int jStashState = GetStashObj(akStashRef,"Items")
-
-	Form kItem = JFormMap.nextKey(jPending)
-	While kItem
-		Int jItemMap = 0
-		Int iCount = JFormMap.GetInt(jPending,kItem)
-		Int iItemIdx = JValue.evalLuaInt(jStashState, "return jc.find(jobject, function (x) return x.form == Form(" + kItem.GetFormID() + ") end)") - 1
-		If iItemIdx >= 0
-			jItemMap = JArray.GetObj(jStashState,iItemIdx)
-		EndIf
-		If jItemMap
-			Int iStateCount = JMap.GetInt(jItemMap,"Count")
-			If iStateCount
-				JMap.SetInt(jItemMap,"Count",iStateCount + iCount)
-			EndIf
-		Else
-			Int iType = kItem.GetType()
-			jItemMap = _CreateItemMap(akStashRef,kMoveTarget,kContainerTarget,kItem,iCount,iType)
-			JArray.AddObj(jStashState,jItemMap)
-		EndIf
-
-		kItem = JFormMap.nextKey(jPending,kItem)
-	EndWhile
-	JMap.RemoveKey(jStashMap,"Pending")
-	Return iPendingCount
 EndFunction
 
 Int Function ExportStashItems(ObjectReference akStashRef) Global

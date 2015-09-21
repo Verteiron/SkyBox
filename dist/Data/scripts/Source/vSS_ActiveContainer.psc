@@ -111,7 +111,7 @@ EndEvent
 Function PlaceFX(ObjectReference akStashRef)
 	_kGlow = akStashRef.PlaceAtMe(dunKagrenzelFXActivator, abInitiallyDisabled = True)
 	If StringUtil.Find(akStashRef.GetBaseObject().GetName(),"sack") > -1
-		_kGlow.MoveTo(akStashRef,0,0,akStashRef.GetHeight() * 0.25)
+		_kGlow.MoveTo(akStashRef,0,0,akStashRef.GetHeight() * 0.1)
 	Else
 		_kGlow.MoveTo(akStashRef,0,0,akStashRef.GetHeight() * 0.6)
 	EndIf
