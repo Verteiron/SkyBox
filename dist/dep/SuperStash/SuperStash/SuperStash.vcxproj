@@ -53,14 +53,14 @@
       <Optimization>Disabled</Optimization>
       <SDLCheck>
       </SDLCheck>
-      <AdditionalIncludeDirectories>$(SolutionDir)\dep;$(SolutionDir)\dep\skse;$(SolutionDir)\dep\jsoncpp;$(ProjectDir);$(SolutionDir)\dep\ziputils;$(ProjectDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)\dep;$(SolutionDir)\dep\skse;$(SolutionDir)\dep\jsoncpp;$(ProjectDir);$(SolutionDir)\dep\nioverride;$(SolutionDir)\dep\ziputils;$(ProjectDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <PrecompiledHeader />
       <StringPooling>true</StringPooling>
       <InlineFunctionExpansion>Default</InlineFunctionExpansion>
       <WholeProgramOptimization>false</WholeProgramOptimization>
       <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;_USRDLL;PLUGIN_EXAMPLE_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_SCL_SECURE_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;WIN32;_DEBUG;_WINDOWS;_USRDLL;PLUGIN_EXAMPLE_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <ForcedIncludeFiles>common/IPrefix.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
     </ClCompile>
@@ -73,7 +73,7 @@
       </EnableCOMDATFolding>
       <ModuleDefinitionFile>exports.def</ModuleDefinitionFile>
       <LinkTimeCodeGeneration />
-      <ShowProgress>LinkVerboseLib</ShowProgress>
+      <ShowProgress>LinkVerboseREF</ShowProgress>
     </Link>
     <PostBuildEvent>
       <Command>xcopy /y "$(TargetPath)" "$(ProgramFiles)\Steam\steamapps\common\Skyrim\Data\SKSE\Plugins\$(TargetFileName)"</Command>
@@ -90,7 +90,7 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>
       </SDLCheck>
-      <AdditionalIncludeDirectories>$(SolutionDir)\dep;$(SolutionDir)\dep\skse;$(SolutionDir)\dep\jsoncpp;$(ProjectDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)\dep;$(SolutionDir)\dep\skse;$(SolutionDir)\dep\jsoncpp;$(ProjectDir);$(SolutionDir)\dep\nioverride;$(SolutionDir)\dep\ziputils;$(ProjectDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <PrecompiledHeader />
       <StringPooling>true</StringPooling>
@@ -121,12 +121,11 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\dep\nioverride\interfaces\IPluginInterface.h" />
-    <ClInclude Include="..\dep\nioverride\ItemDataInterface.h" />
     <ClInclude Include="fileutils.h" />
     <ClInclude Include="itemutils.h" />
     <ClInclude Include="jcutils.h" />
     <ClInclude Include="PapyrusSuperStash.h" />
+    <ClInclude Include="resource.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\dep\common\common.vcxproj">
@@ -146,6 +145,9 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="exports.def" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="SuperStash.rc" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
