@@ -116,7 +116,7 @@ SInt32 ssRotateFile(const std::string& filename, SInt32 maxCount)
 	sprintf_s(targetFilename, "%s.%d", fname, maxCount);
 	_makepath_s(targetPath, _MAX_PATH, drive, dir, targetFilename, ext);
 	err = SSDeleteFile(targetPath);
-	if (err != 0)
+	if (err && err != ERROR_FILE_NOT_FOUND)
 	{
 		_ERROR("%s - error deleting file %s (Error %d)", __FUNCTION__, targetFilename, err);
 		return err;
