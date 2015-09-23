@@ -18,6 +18,9 @@ Int Function GetStashFormMap() Global
 	EndIf
 	jStashFormMap = JFormMap.Object()
 	SetRegObj("StashFormMap",jStashFormMap)
+	Int jStashUUIDS = JMap.Object()
+	SetRegObj("Stashes",jStashUUIDS)
+
 	Return jStashFormMap
 EndFunction
 
@@ -29,6 +32,9 @@ Int Function GetStashJMap(ObjectReference akStashRef, Bool abCreateIfMissing = F
 	EndIf
 	If abCreateIfMissing
 		jStashJMap = JMap.object()
+		String sUUID = SuperStash.UUID()
+		JMap.SetStr(jStashJMap,"UUID",sUUID)
+		SetRegObj("Stashes." + sUUID, jStashJMap)
 		JFormMap.SetObj(jStashFormMap,akStashRef,jStashJMap)
 		SaveReg()
 		Return jStashJMap
@@ -240,40 +246,40 @@ EndFunction
 Function CreateMCMLists() Global
 	DebugTraceAPIStash("Creating MCM lists...")
 	Int jMCM = JMap.Object()
-	Int jStashFormMap = GetStashFormMap()
-
 	Int jMCMNames = JArray.Object()
-	Form kKey = JFormMap.NextKey(jStashFormMap)
 
-	Int jStashList = JFormMap.AllValues(jStashFormMap)
-	Int i = JArray.Count(jStashList)
-	While i > 0
-		i -= 1
-		Int jStashData = JArray.GetObj(jStashList,i)
-		kKey = JMap.GetForm(jStashData,"Form")
-		DebugTraceAPIStash("Key is " + kKey + "!")
+
+	Int jStashList = GetRegObj("Stashes")
+	String sUUID = JMap.NextKey(jStashList)
+	While sUUID
+		Int jStashData = JMap.GetObj(jStashList,sUUID)
+		Form kStashRef = JMap.GetForm(jStashData,"Form")
 		String sCellName = JMap.GetStr(jStashData,"CellName") 
 		String sStashName = JMap.GetStr(jStashData,"StashName")
 		String sStashID = JMap.GetStr(jStashData,"FormIDString")
 		
-		JValue.SolveIntSetter(jMCM,".CellMap." + sCellName + "." + sStashName + "." + sStashID,JMap.GetInt(jStashData,"FormID"),True)
+		JValue.SolveStrSetter(jMCM,".CellMap." + sCellName + "." + sStashName + "." + sStashID,sUUID,True)
+		String sStashMCMName = sCellName + "/" + sStashName
+		
+		Int i = 2
+		While JArray.FindStr(jMCMNames,sStashMCMName) != -1
+			sStashMCMName = sCellName + "/" + sStashName + "(" + i + ")"
+			i += 1
+		EndWhile
+		JArray.AddStr(jMCMNames,sStashMCMName)
+		JValue.SolveStrSetter(jMCM,".NameMap." + sStashMCMName,sUUID,True)
 
-		;If kKey
-			JArray.AddStr(jMCMNames,sCellName + "/" + sStashName)
-		;EndIf
-
-		;JValue.SolveFormSetter(jMCM,".CellMap." + sCellName + "." + sStashName + "." + sStashID,kKey,True)
+		sUUID = JMap.NextKey(jStashList,sUUID)
 	EndWhile
-	jMCMNames = JArray.Sort(jMCMNames)
-	JMap.SetObj(jMCM,"StringMap",jMCMNames)
 
 	SetSessionObj("MCMMap",jMCM)
 	SaveSession()
+	JValue.Release(jMCMNames)
 	DebugTraceAPIStash("Created MCM lists!")
 EndFunction
 
 String[] Function GetMCMNames() Global
-	Return SuperStash.JObjToArrayStr(JArray.Sort(GetSessionObj("MCMMap.StringMap")))
+	Return SuperStash.JObjToArrayStr(JArray.Sort(JMap.AllKeys(GetSessionObj("MCMMap.NameMap"))))
 EndFunction
 
 ;=== Stash object inventory Functions ===--
