@@ -19,7 +19,8 @@ Import vSS_Session
 vSS_MetaQuestScript 	Property MetaQuest 						Auto
 vSS_StashManager 		Property StashManager 					Auto
 
-String 					Property CurrentStashName 				Auto
+String 					Property CurrentStashName 				Auto Hidden
+String 					Property CurrentStashUUID 				Auto Hidden
 
 ; === Variables ===--
 
@@ -74,7 +75,7 @@ Event OnPageReset(string a_page)
 		EndIf
 		DisplayPanels()
 	ElseIf a_page == Pages[7]
-		AddTextOptionST("OPTION_TEXT_PLAYER_SAVE", "Save player", "right now!")
+		; AddTextOptionST("OPTION_TEXT_PLAYER_SAVE", "Save player", "right now!")
 	Else
 
 	EndIf
@@ -88,39 +89,34 @@ State PANEL_STASH_PICKER
 		SetCursorFillMode(TOP_TO_BOTTOM)
 		
 		SetCursorPosition(aiLeftRight)
+		If !CurrentStashUUID
+			AddMenuOptionST("OPTION_MENU_STASH_PICKER","$Select a stash from the list",CurrentStashName)
+		Else
+			AddMenuOptionST("OPTION_MENU_STASH_PICKER","",CurrentStashName)
+		EndIf
 
-		AddMenuOptionST("OPTION_MENU_STASH_PICKER","$Settings for",CurrentStashName)
-
-		If !CurrentStashName
+		If !CurrentStashUUID
 			DebugTrace("No Stash selected!")
 			Return
 		EndIf
 
-		; String[] sSIDs = vSS_API_Character.GetSIDsByName(CurrentCharacterName)
-		; If sSIDs.Length == 1
-		; 	CurrentSID = sSIDs[0]
-		; 	ShowOptions_SIDPicker(aiLeftRight,True)
-		; ElseIf sSIDs.Length > 1
-		; 	CurrentSID = sSIDs[0]
-		; 	ShowOptions_SIDPicker(aiLeftRight)
-		; Else
-		; 	DebugTrace("No SIDs found for " + CurrentCharacterName,1)
-		; 	AddTextOption("$Error:","No data found!")
-		; 	Return
-		; EndIf
-		; AddEmptyOption()
-		; ;AddPanelLinkOption("PANEL_STASH_INFO","$Character Info")
+		Int jStashData = GetRegObj("Stashes." + CurrentStashUUID)
 
-		; If !CurrentSID 
-		; 	Return
-		; EndIf
-		; SetCursorPosition(aiLeftRight + 6)
-		
-		; String[] sSex 	= New String[2]
-		; sSex[0] 		= "Male"
-		; sSex[1] 		= "Female"
+		ObjectReference kStashRef = JMap.GetForm(jStashData,"Form") as ObjectReference
+		Int iEntryCount = JArray.Count(JMap.GetObj(jStashData,"containerEntries")) + JArray.Count(JMap.GetObj(jStashData,"entryDataList"))
 
-		; AddTextOption("Level " + (vSS_API_Character.GetCharacterLevel(CurrentSID) as Int) + " " + (vSS_API_Character.GetCharacterStr(CurrentSID,".Info.RaceText")) + " " + sSex[vSS_API_Character.GetCharacterSex(CurrentSID)],"",OPTION_FLAG_DISABLED)
+		SetCursorPosition(aiLeftRight + 6)
+		AddInputOptionST("OPTION_INPUT_STASH_NAME","$Stash name",JMap.GetStr(jStashData,"StashName"))
+		AddTextOption("$Location",JMap.GetStr(jStashData,"CellName"),OPTION_FLAG_DISABLED)
+		AddTextOption("$Form ID",JMap.GetStr(jStashData,"FormIDString"),OPTION_FLAG_DISABLED)
+
+		String sStatus = "$Not loaded"
+		If kStashRef
+			sStatus = "$Loaded"
+		EndIf
+
+		AddTextOption("$Status",sStatus,OPTION_FLAG_DISABLED)
+		AddTextOption("$Item entries",iEntryCount,OPTION_FLAG_DISABLED)
 
 		; AddTextOption("Health: " + (vSS_API_Character.GetCharacterAV(CurrentSID,"Health") as Int) + \
 		; 				", Stamina:" + (vSS_API_Character.GetCharacterAV(CurrentSID,"Stamina") as Int) + \
@@ -237,6 +233,7 @@ State OPTION_MENU_STASH_PICKER
 		String sStashName = _sStashNames[aiIndex]
 		If sStashName
 			CurrentStashName = sStashName
+			CurrentStashUUID = GetSessionStr("MCMMap.NameMap." + sStashName)
 		Else
 			DebugTrace("OPTION_MENU_STASH_PICKER: No stash name found for index " + aiIndex + "!")
 		EndIf
@@ -245,6 +242,23 @@ State OPTION_MENU_STASH_PICKER
 
 EndState
 
+State OPTION_INPUT_STASH_NAME
+
+	Event OnInputOpenST()
+		SetInputDialogStartText(GetRegStr("Stashes." + CurrentStashUUID + ".StashName"))
+	EndEvent
+
+	Event OnInputAcceptST(string a_input)
+		If a_input != GetRegStr("Stashes." + CurrentStashUUID + ".StashName")
+			CurrentStashName = a_input
+			SetRegStr("Stashes." + CurrentStashUUID + ".StashName",a_input)
+			vSS_API_Stash.CreateMCMLists()
+			_sStashNames = vSS_API_Stash.GetMCMNames()
+			ForcePageReset()
+		EndIf
+	EndEvent
+
+EndState
 
 Event OnOptionSelect(int a_option)
 	;A few options really aren't suited for states, so handle them here
