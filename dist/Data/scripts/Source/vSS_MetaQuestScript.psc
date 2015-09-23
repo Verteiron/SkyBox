@@ -54,7 +54,7 @@ Int _iUpkeepsCompleted
 Event OnInit()
 	DebugTrace("Metaquest event: OnInit - IsRunning: " + IsRunning() + " ModVersion: " + ModVersion + " ModVersionMajor: " + ModVersionMajor)
 	If IsRunning() && ModVersion == 0 && !ModVersionMajor
-		DoUpkeep(True)
+		RegisterForSingleUpdate(2)
 	EndIf
 EndEvent
 
@@ -63,7 +63,7 @@ Event OnReset()
 EndEvent
 
 Event OnUpdate()
-
+	DoUpkeep(True)
 EndEvent
 
 Event OnGameReload()

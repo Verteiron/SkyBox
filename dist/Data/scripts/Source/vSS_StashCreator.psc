@@ -29,5 +29,4 @@ Event OnEffectStart(Actor akTarget, Actor akCaster)
 	ActiveContainer.Clear()
 	ActiveContainer.ForceRefTo(kStashRef)
 	(ActiveContainer as vSS_ActiveContainer).OnStashCreate()
-	
 EndEvent

@@ -205,6 +205,77 @@ String[] Function GetStashItems(ObjectReference akStashRef) Global
 	Return sRet
 EndFunction
 
+Form[] Function GetAllStashObjects() Global
+	Int jStashFormMap = GetStashFormMap()
+	Int iCount = JFormMap.Count(jStashFormMap)
+	Form[] kResult = Utility.CreateFormArray(iCount)
+	
+	Int i = 0
+	Form kKey = JFormMap.NextKey(jStashFormMap)
+	While kKey
+		kResult[i] = kKey
+		kKey = JFormMap.NextKey(jStashFormMap,kKey)
+		i += 1
+	EndWhile
+
+	Return kResult
+EndFunction
+
+Form[] Function GetStashObjectsInCell() Global
+	Int jStashFormMap = GetStashFormMap()
+	Int iCount = JFormMap.Count(jStashFormMap)
+	Form[] kResult = Utility.CreateFormArray(iCount)
+	
+	Int i = 0
+	Form kKey = JFormMap.NextKey(jStashFormMap)
+	While kKey
+		kResult[i] = kKey
+		kKey = JFormMap.NextKey(jStashFormMap,kKey)
+		i += 1
+	EndWhile
+
+	Return kResult
+EndFunction
+
+Function CreateMCMLists() Global
+	DebugTraceAPIStash("Creating MCM lists...")
+	Int jMCM = JMap.Object()
+	Int jStashFormMap = GetStashFormMap()
+
+	Int jMCMNames = JArray.Object()
+	Form kKey = JFormMap.NextKey(jStashFormMap)
+
+	Int jStashList = JFormMap.AllValues(jStashFormMap)
+	Int i = JArray.Count(jStashList)
+	While i > 0
+		i -= 1
+		Int jStashData = JArray.GetObj(jStashList,i)
+		kKey = JMap.GetForm(jStashData,"Form")
+		DebugTraceAPIStash("Key is " + kKey + "!")
+		String sCellName = JMap.GetStr(jStashData,"CellName") 
+		String sStashName = JMap.GetStr(jStashData,"StashName")
+		String sStashID = JMap.GetStr(jStashData,"FormIDString")
+		
+		JValue.SolveIntSetter(jMCM,".CellMap." + sCellName + "." + sStashName + "." + sStashID,JMap.GetInt(jStashData,"FormID"),True)
+
+		;If kKey
+			JArray.AddStr(jMCMNames,sCellName + "/" + sStashName)
+		;EndIf
+
+		;JValue.SolveFormSetter(jMCM,".CellMap." + sCellName + "." + sStashName + "." + sStashID,kKey,True)
+	EndWhile
+	jMCMNames = JArray.Sort(jMCMNames)
+	JMap.SetObj(jMCM,"StringMap",jMCMNames)
+
+	SetSessionObj("MCMMap",jMCM)
+	SaveSession()
+	DebugTraceAPIStash("Created MCM lists!")
+EndFunction
+
+String[] Function GetMCMNames() Global
+	Return SuperStash.JObjToArrayStr(JArray.Sort(GetSessionObj("MCMMap.StringMap")))
+EndFunction
+
 ;=== Stash object inventory Functions ===--
 
 Int Function LoadStashesForCell(Cell akCell) Global
@@ -320,6 +391,28 @@ Int Function ExportStashItems(ObjectReference akStashRef) Global
 	;SetStashObj(akStashRef,"ContainerState",jStashState)
 	SetStashStr(akStashRef,"LastSessionID",sSessionID)
 	SetStashFlt(akStashRef,"LastSessionTime",fSessionTime)
+	SetStashForm(akStashRef,"Form",akStashRef)
+	SetStashInt(akStashRef,"FormID",akStashRef.GetFormID())
+	SetStashStr(akStashRef,"FormIDString",GetFormIDString(akStashRef))
+	SetStashStr(akStashRef,"Source",SuperStash.GetSourceMod(akStashRef))
+
+	String sCellName = akStashRef.GetParentCell().GetName()
+	If sCellName
+		SetStashStr(akStashRef,"CellName",sCellName)
+	Else
+		SetStashStr(akStashRef,"CellName","Unnamed Cell")
+	EndIf
+
+	String sStashName = akStashRef.GetName()
+	If !sStashName
+		sStashName = akStashRef.GetBaseObject().GetName()
+	EndIf
+
+	If sStashName
+		SetStashStr(akStashRef,"StashName",sStashName)
+	Else 
+		SetStashStr(akStashRef,"StashName","Unnamed container")
+	EndIf
 
 	;kContainerShader.Stop(akStashRef)
 	akStashRef.BlockActivation(False)

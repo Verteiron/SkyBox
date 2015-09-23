@@ -140,7 +140,7 @@ Function DoUpkeep(Bool bInBackground = True)
 	;=== Don't register this until after we've init'd everything else
 	RegisterForModEvent("vSS_BackgroundFunction","OnBackgroundFunction")
 	;RegisterForModEvent("vSS_LoadSerializedEquipmentReq","OnLoadSerializedEquipmentReq")
-
+vSS_API_Stash.CreateMCMLists()
 	IsBusy = False
 	GotoState("")
 	DebugTrace("Finished upkeep!")
