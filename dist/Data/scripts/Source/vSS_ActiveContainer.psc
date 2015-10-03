@@ -76,14 +76,18 @@ Event OnActivate(ObjectReference akActionRef)
 EndEvent
 
 Event OnStashCreate()
-	DebugTrace("OnStashCreate()")
 	_SelfRef = Self.GetReference()
+	DebugTrace("OnStashCreate()")
+	String sStashID
 	PlaceFX(_SelfRef)
-	If !vSS_API_Stash.IsStash(_SelfRef)
-		vSS_API_Stash.CreateStash(_SelfRef)
+	If !vSS_API_Stash.IsStashRef(_SelfRef)
+		DebugTrace("Not a StashRef, calling CreateStashRef..")
+		vSS_API_Stash.CreateStashRef(_SelfRef)
+		sStashID = vSS_API_Stash.GetUUIDForStashRef(_SelfRef)
+		DebugTrace("My Stash UUID is " + sStashID)
 	EndIf
 	PlayFX()
-	Int iCount = vSS_API_Stash.ExportStashItems(_SelfRef)
+	Int iCount = vSS_API_Stash.ExportStashItems(sStashID)
 	Clear()
 	StopFX()
 EndEvent
@@ -92,7 +96,7 @@ Event OnStashOpen()
 	DebugTrace("OnStashOpen()")
 	_SelfRef = Self.GetReference()
 
-	If !vSS_API_Stash.IsStash(_SelfRef)
+	If !vSS_API_Stash.IsStashRef(_SelfRef)
 		DebugTrace("Not a Stash!")
 		Return
 		;vSS_API_Stash.CreateStash(_SelfRef)
@@ -103,7 +107,8 @@ Event OnStashOpen()
 		Utility.Wait(0.2)
 	EndWhile
 	PlayFX()
-	Int iCount = vSS_API_Stash.ExportStashItems(_SelfRef)
+	String sStashID = vSS_API_Stash.GetUUIDForStashRef(_SelfRef)
+	Int iCount = vSS_API_Stash.ExportStashItems(sStashID)
 	Clear()
 	StopFX()
 EndEvent

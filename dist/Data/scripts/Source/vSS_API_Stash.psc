@@ -6,10 +6,14 @@ Scriptname vSS_API_Stash extends vSS_APIBase Hidden
 ; between multiple savegames/sessions.
 ; ========================================================---
 
+; FIXME: HEY I just had this really hoopy idea. Papyrus coerces Forms into Strings. This means I can check
+; to see if an incoming string is actually a Form, and consolidate these split functions into one 
+; without breaking compatibility. Maybe. Might not be worth the effort.
+
 Import vSS_Registry
 Import vSS_Session
 
-;=== Generic Functions ===--
+;=== Stash data init Functions ===--
 
 Int Function GetStashFormMap() Global
 	Int jStashFormMap = GetRegObj("StashFormMap")
@@ -24,22 +28,54 @@ Int Function GetStashFormMap() Global
 	Return jStashFormMap
 EndFunction
 
-Int Function GetStashJMap(ObjectReference akStashRef, Bool abCreateIfMissing = False) Global
+String Function CreateStashData(ObjectReference akStashRef) Global
+	Int jStashJMap = JMap.object()
+	String sUUID = SuperStash.UUID()
+	JMap.SetStr(jStashJMap,"UUID",sUUID)
+	JMap.SetForm(jStashJMap,"Form",akStashRef)
+	
+	;Create Registry entries
+	SetRegObj("Stashes." + sUUID, jStashJMap)
+	JFormMap.SetObj(GetStashFormMap(),akStashRef,jStashJMap)
+	SaveReg()
+	
+	Return sUUID
+EndFunction
+
+Int Function GetStashJMap(String asUUID) Global
+	Int jStashJMap = GetRegObj("Stashes." + asUUID)
+	If JValue.isMap(jStashJMap)
+		Return jStashJMap
+	EndIf
+	Return 0
+EndFunction
+
+Int Function GetStashRefJMap(ObjectReference akStashRef) Global
 	Int jStashFormMap = GetStashFormMap()
 	Int jStashJMap = JFormMap.GetObj(jStashFormMap,akStashRef)
 	If JValue.isMap(jStashJMap)
 		Return jStashJMap
 	EndIf
-	If abCreateIfMissing
-		jStashJMap = JMap.object()
-		String sUUID = SuperStash.UUID()
-		JMap.SetStr(jStashJMap,"UUID",sUUID)
-		SetRegObj("Stashes." + sUUID, jStashJMap)
-		JFormMap.SetObj(jStashFormMap,akStashRef,jStashJMap)
-		SaveReg()
-		Return jStashJMap
-	EndIf
+	;jStashJMap wasn't valid, try searching the long way
+	Int jStashList = GetRegObj("Stashes")
+	String sKey = JMap.NextKey(jStashList)
+	While sKey
+		Int jStashValue = JMap.GetObj(jStashList,sKey)
+		If JMap.GetForm(jStashValue,"Form") == akStashRef
+			DebugTraceAPIStash("GetStashRefJMap: Warning! Stash data exists for " + akStashRef + " but is not indexed in StashFormMap! UUID: " + JMap.GetStr(jStashValue,"UUID"))
+			Return jStashValue
+		EndIf
+		sKey = JMap.NextKey(jStashList,sKey)
+	EndWhile
 	Return 0
+EndFunction
+
+String Function GetUUIDForStashRef(ObjectReference akStashRef) Global
+	Return JMap.GetStr(GetStashRefJMap(akStashRef),"UUID")
+EndFunction
+
+ObjectReference Function GetStashRefForUUID(String asUUID) Global
+	Return JMap.GetForm(GetStashJMap(asUUID),"Form") as ObjectReference
 EndFunction
 
 Int Function GetStashSessionFormMap() Global
@@ -52,124 +88,214 @@ Int Function GetStashSessionFormMap() Global
 	Return jStashFormMap
 EndFunction
 
-Int Function GetStashSessionJMap(ObjectReference akStashRef, Bool abCreateIfMissing = False) Global
+Int Function CreateStashSessionJMap(String asUUID = "") Global
+	Int jStashJMap = JMap.object()
+	If !asUUID
+		asUUID = SuperStash.UUID()
+	Else
+		DebugTraceAPIStash("CreateStashSessionJMap: Warning! Creating new Stash JMap based on existing UUID, this may result in data loss! UUID: " + asUUID,1)
+	EndIf
+	JMap.SetStr(jStashJMap,"UUID",asUUID)
+	SetSessionObj("Stashes." + asUUID, jStashJMap)
+	SaveSession()
+	Return jStashJMap
+EndFunction
+
+Int Function GetStashSessionJMap(String asUUID, Bool abCreateIfMissing = False) Global
+	Int jStashJMap = GetSessionObj("Stashes." + asUUID)
+	If JValue.isMap(jStashJMap)
+		Return jStashJMap
+	EndIf
+	If abCreateIfMissing
+		Return CreateStashSessionJMap(asUUID)
+	EndIf
+	Return 0
+EndFunction
+
+Int Function GetStashRefSessionJMap(ObjectReference akStashRef, Bool abCreateIfMissing = False) Global
 	Int jStashFormMap = GetStashSessionFormMap()
 	Int jStashJMap = JFormMap.GetObj(jStashFormMap,akStashRef)
 	If JValue.isMap(jStashJMap)
 		Return jStashJMap
 	EndIf
 	If abCreateIfMissing
-		jStashJMap = JMap.object()
+		jStashJMap = CreateStashSessionJMap()
 		JFormMap.SetObj(jStashFormMap,akStashRef,jStashJMap)
+		SaveSession()
 		Return jStashJMap
 	EndIf
 	Return 0
 EndFunction
 
-;=== Generic Get/Set Functions ===--
+;=== Generic Get/Set by UUID Functions ===--
 
-Int Function GetStashSessionInt(ObjectReference akStashRef, String asKey) Global
+Int Function GetStashSessionInt(String asUUID, String asKey) Global
 	asKey = MakePath(asKey)
-	Int jStashJMap = GetStashSessionJMap(akStashRef)
+	Int jStashJMap = GetStashSessionJMap(asUUID)
 	If jStashJMap
 		Return JValue.solveInt(jStashJMap,asKey)
 	EndIf
 	Return 0
 EndFunction
 
-Function SetStashSessionInt(ObjectReference akStashRef, String asKey, Int aiValue) Global
+Function SetStashSessionInt(String asUUID, String asKey, Int aiValue) Global
 	asKey = MakePath(asKey)
-	JValue.solveIntSetter(GetStashSessionJMap(akStashRef,True),asKey,aiValue,True)
-	SaveReg()
+	JValue.solveIntSetter(GetStashSessionJMap(asUUID,True),asKey,aiValue,True)
+	SaveSession()
 EndFunction
 
-Int Function GetStashInt(ObjectReference akStashRef, String asKey) Global
+Int Function GetStashInt(String asUUID, String asKey) Global
 	asKey = MakePath(asKey)
-	Int jStashJMap = GetStashJMap(akStashRef)
+	Int jStashJMap = GetStashJMap(asUUID)
 	If jStashJMap
 		Return JValue.solveInt(jStashJMap,asKey)
 	EndIf
 	Return 0
 EndFunction
 
-Function SetStashInt(ObjectReference akStashRef, String asKey, Int aiValue) Global
+Function SetStashInt(String asUUID, String asKey, Int aiValue) Global
 	asKey = MakePath(asKey)
-	JValue.solveIntSetter(GetStashJMap(akStashRef,True),asKey,aiValue,True)
+	JValue.solveIntSetter(GetStashJMap(asUUID),asKey,aiValue,True)
 	SaveReg()
 EndFunction
 
-Float Function GetStashFlt(ObjectReference akStashRef, String asKey) Global
+Float Function GetStashFlt(String asUUID, String asKey) Global
 	asKey = MakePath(asKey)
-	Int jStashJMap = GetStashJMap(akStashRef)
+	Int jStashJMap = GetStashJMap(asUUID)
 	If jStashJMap
 		Return JValue.solveFlt(jStashJMap,asKey)
 	EndIf
 	Return 0
 EndFunction
 
-Function SetStashFlt(ObjectReference akStashRef, String asKey, Float afValue) Global
+Function SetStashFlt(String asUUID, String asKey, Float afValue) Global
 	asKey = MakePath(asKey)
-	JValue.solveFltSetter(GetStashJMap(akStashRef,True),asKey,afValue,True)
+	JValue.solveFltSetter(GetStashJMap(asUUID),asKey,afValue,True)
 	SaveReg()
 EndFunction
 
-String Function GetStashStr(ObjectReference akStashRef, String asKey) Global
+String Function GetStashStr(String asUUID, String asKey) Global
 	asKey = MakePath(asKey)
-	Int jStashJMap = GetStashJMap(akStashRef)
+	Int jStashJMap = GetStashJMap(asUUID)
 	If jStashJMap
 		Return JValue.solveStr(jStashJMap,asKey)
 	EndIf
 	Return ""
 EndFunction
 
-Function SetStashStr(ObjectReference akStashRef, String asKey, String asValue) Global
+Function SetStashStr(String asUUID, String asKey, String asValue) Global
 	asKey = MakePath(asKey)
-	JValue.solveStrSetter(GetStashJMap(akStashRef,True),asKey,asValue,True)
+	JValue.solveStrSetter(GetStashJMap(asUUID),asKey,asValue,True)
 	SaveReg()
 EndFunction
 
-Form Function GetStashForm(ObjectReference akStashRef, String asKey) Global
+Form Function GetStashForm(String asUUID, String asKey) Global
 	asKey = MakePath(asKey)
-	Int jStashJMap = GetStashJMap(akStashRef)
+	Int jStashJMap = GetStashJMap(asUUID)
 	If jStashJMap
 		Return JValue.solveForm(jStashJMap,asKey)
 	EndIf
 	Return None
 EndFunction
 
-Function SetStashForm(ObjectReference akStashRef, String asKey, Form akValue) Global
+Function SetStashForm(String asUUID, String asKey, Form akValue) Global
 	asKey = MakePath(asKey)
-	JValue.solveFormSetter(GetStashJMap(akStashRef,True),asKey,akValue,True)
+	JValue.solveFormSetter(GetStashJMap(asUUID),asKey,akValue,True)
 	SaveReg()
 EndFunction
 
-Int Function GetStashObj(ObjectReference akStashRef, String asKey) Global
+Int Function GetStashObj(String asUUID, String asKey) Global
 	asKey = MakePath(asKey)
-	Int jStashJMap = GetStashJMap(akStashRef)
+	Int jStashJMap = GetStashJMap(asUUID)
 	If jStashJMap
 		Return JValue.solveObj(jStashJMap,asKey)
 	EndIf
 	Return 0
 EndFunction
 
-Function SetStashObj(ObjectReference akStashRef, String asKey, Int ajValue) Global
+Function SetStashObj(String asUUID, String asKey, Int ajValue) Global
 	asKey = MakePath(asKey)
-	JValue.solveObjSetter(GetStashJMap(akStashRef,True),asKey,ajValue,True)
+	JValue.solveObjSetter(GetStashJMap(asUUID),asKey,ajValue,True)
 	SaveReg()
+EndFunction
+
+;=== Generic Get/Set by ObjectReference Functions ===--
+;  These are mostly wrappers for the previous section. It is useful to refer to 
+;  the Stash by its ObjectReference rather than by its UUID sometimes.
+
+Int Function GetStashRefSessionInt(ObjectReference akStashRef, String asKey) Global
+	Return GetStashSessionInt(GetUUIDForStashRef(akStashRef), asKey)
+EndFunction
+
+Function SetStashRefSessionInt(ObjectReference akStashRef, String asKey, Int aiValue) Global
+	SetStashSessionInt(GetUUIDForStashRef(akStashRef), asKey, aiValue)
+EndFunction
+
+Int Function GetStashRefInt(ObjectReference akStashRef, String asKey) Global
+	Return GetStashInt(GetUUIDForStashRef(akStashRef), asKey)
+EndFunction
+
+Function SetStashRefInt(ObjectReference akStashRef, String asKey, Int aiValue) Global
+	SetStashInt(GetUUIDForStashRef(akStashRef), asKey, aiValue)
+EndFunction
+
+Float Function GetStashRefFlt(ObjectReference akStashRef, String asKey) Global
+	Return GetStashFlt(GetUUIDForStashRef(akStashRef), asKey)
+EndFunction
+
+Function SetStashRefFlt(ObjectReference akStashRef, String asKey, Float afValue) Global
+	SetStashFlt(GetUUIDForStashRef(akStashRef), asKey, afValue)
+EndFunction
+
+String Function GetStashRefStr(ObjectReference akStashRef, String asKey) Global
+	Return GetStashStr(GetUUIDForStashRef(akStashRef), asKey)
+EndFunction
+
+Function SetStashRefStr(ObjectReference akStashRef, String asKey, String asValue) Global
+	SetStashStr(GetUUIDForStashRef(akStashRef), asKey, asValue)
+EndFunction
+
+Form Function GetStashRefForm(ObjectReference akStashRef, String asKey) Global
+	Return GetStashForm(GetUUIDForStashRef(akStashRef), asKey)
+EndFunction
+
+Function SetStashRefForm(ObjectReference akStashRef, String asKey, Form akValue) Global
+	SetStashForm(GetUUIDForStashRef(akStashRef), asKey, akValue)
+EndFunction
+
+Int Function GetStashRefObj(ObjectReference akStashRef, String asKey) Global
+	Return GetStashObj(GetUUIDForStashRef(akStashRef), asKey)
+EndFunction
+
+Function SetStashRefObj(ObjectReference akStashRef, String asKey, Int ajValue) Global
+	SetStashObj(GetUUIDForStashRef(akStashRef), asKey, ajValue)
 EndFunction
 
 ;=== Data Functions ===--
 
-Bool Function CreateStash(ObjectReference akStashRef, Int aiStashGroup = 0) Global
-	If IsStash(akStashRef)
+Bool Function IsStash(String asUUID) Global
+	Return JValue.IsMap(GetStashJMap(asUUID))
+EndFunction
+
+Bool Function CreateStashRef(ObjectReference akStashRef, Int aiStashGroup = 0) Global
+	If IsStashRef(akStashRef)
 		DebugTraceAPIStash("Error! " + akStashRef + " is already a Stash!")
 		Return False
 	EndIf
 	If akStashRef.GetType() == 28 || akStashRef.GetBaseObject().GetType() == 28 ;kContainer
-		SetStashInt(akStashRef,"DataSerial",0)
-		SetStashSessionInt(akStashRef,"DataSerial",0)
-		SetStashGroup(akStashRef,aiStashGroup)
-		Return True
+		;JFormMap.SetObj(GetStashFormMap(),akStashRef,CreateStashJMap())
+		String sStashID = CreateStashData(akStashRef)
+		Int jStashMap = GetStashJMap(sStashID)
+		If jStashMap
+			;Calling SetStashRef* creates the JMap entry automatically
+			SetStashRefInt(akStashRef,"DataSerial",0)
+			SetStashRefSessionInt(akStashRef,"DataSerial",0)
+			SetStashRefGroup(akStashRef,aiStashGroup)
+			SaveReg()
+			Return True
+		EndIf
+		DebugTraceAPIStash("Error! Tried and failed to create record for " + akStashRef + "!")
+		Return False
 	Else
 		DebugTraceAPIStash("Error! " + akStashRef + " is not a Container!")
 		Return False
@@ -177,38 +303,52 @@ Bool Function CreateStash(ObjectReference akStashRef, Int aiStashGroup = 0) Glob
 	Return False
 EndFunction
 
-Bool Function DeleteStash(ObjectReference akStashRef) Global
+Bool Function DeleteStashRef(ObjectReference akStashRef) Global
 	Return JFormMap.RemoveKey(GetStashFormMap(),akStashRef)
 EndFunction
 
-Bool Function IsStash(ObjectReference akStashRef) Global
-	If GetStashJMap(akStashRef)
+Bool Function IsStashRef(ObjectReference akStashRef) Global
+	If GetStashRefJMap(akStashRef)
 		Return True
 	EndIf
 	Return False
 EndFunction
 
-Function SetStashGroup(ObjectReference akStashRef, Int aiStashGroup = 0) Global
-	If IsStash(akStashRef)
-		SetStashInt(akStashRef,"Group",aiStashGroup)
+Function SetStashGroup(String asUUID, Int aiStashGroup = 0) Global
+	If IsStash(asUUID)
+		SetStashInt(asUUID,"Group",aiStashGroup)
 	Else
-		DebugTraceAPIStash("Error! " + akStashRef + " is not a valid Stash!")
+		DebugTraceAPIStash("SetStashGroup: Error! " + asUUID + " is not a valid Stash!")
 	EndIf
 EndFunction
 
-Int Function GetStashGroup(ObjectReference akStashRef) Global
-	Return GetStashInt(akStashRef,"Group")
+Int Function GetStashGroup(String asUUID) Global
+	Return GetStashInt(asUUID,"Group")
 EndFunction
 
-String[] Function GetStashItems(ObjectReference akStashRef) Global
-	String[] sRet = New String[1]
+Function SetStashRefGroup(ObjectReference akStashRef, Int aiStashGroup = 0) Global
+	SetStashRefInt(akStashRef,"Group",aiStashGroup)
+EndFunction
 
-	Int jItemArray = GetStashObj(akStashRef,"Items")
-	If jItemArray 
-		Return SuperStash.JObjToArrayStr(jItemArray)
-	EndIf
+Int Function GetStashRefGroup(ObjectReference akStashRef) Global
+	Return GetStashRefInt(akStashRef,"Group")
+EndFunction
 
-	Return sRet
+Int Function GetStashEntryCount(String asUUID) Global
+	Int jStashData = GetStashJMap(asUUID)
+	Return JArray.Count(JMap.GetObj(jStashData,"containerEntries")) + JArray.Count(JMap.GetObj(jStashData,"entryDataList"))
+EndFunction
+
+String[] Function GetStashItems(String asUUID) Global
+	;FIXME
+	; String[] sRet = New String[1]
+
+	; Int jItemArray = GetStashObj(akStashRef,"Items")
+	; If jItemArray 
+	; 	Return SuperStash.JObjToArrayStr(jItemArray)
+	; EndIf
+
+	; Return sRet
 EndFunction
 
 Form[] Function GetAllStashObjects() Global
@@ -289,7 +429,7 @@ Int Function LoadStashesForCell(Cell akCell) Global
 	Int i = 0
 	While i < iContainerCount
 		ObjectReference kContainer = akCell.GetNthRef(i,28)
-		If IsStash(kContainer)
+		If IsStashRef(kContainer)
 			DebugTraceAPIStash("Found Stash " + kContainer + "!")
 			
 			Int iCount = ImportStashItems(kContainer)
@@ -304,8 +444,8 @@ Int Function LoadStashesForCell(Cell akCell) Global
 EndFunction
 
 Int Function ImportStashItems(ObjectReference akStashRef) Global
-	If !IsStash(akStashRef)
-		DebugTraceAPIStash("Error! " + akStashRef + " is not a valid Stash!")
+	If !IsStashRef(akStashRef)
+		DebugTraceAPIStash("ImportStashItems: Error! " + akStashRef + " is not a valid Stash!")
 		Return 0
 	EndIf
 
@@ -347,20 +487,27 @@ Int Function ScanContainer(ObjectReference akStashRef) Global
 	Return jContainerState
 EndFunction
 
-Int Function ExportStashItems(ObjectReference akStashRef) Global
-	If !IsStash(akStashRef)
-		DebugTraceAPIStash("Error! " + akStashRef + " is not a valid Stash!")
+Int Function ExportStashItems(String asUUID) Global
+	If !IsStash(asUUID)
+		DebugTraceAPIStash("ExportStashItems: Error! " + asUUID + " is not a valid Stash!")
 		Return -1
 	EndIf
 
-	akStashRef.BlockActivation(True)
+	ObjectReference kStashRef = GetStashRefForUUID(asUUID)
+
+	If !kStashRef
+		DebugTraceAPIStash("ExportStashItems: Error! " + kStashRef + " is not a valid Stash ObjectReference!")
+		Return -2
+	EndIf
+
+	kStashRef.BlockActivation(True)
 	
-	If GetStashInt(akStashRef,"Busy")
-		DebugTraceAPIStash("Error! " + akStashRef + " is busy!")
+	If GetStashInt(asUUID,"Busy")
+		DebugTraceAPIStash("Error! " + asUUID + " is busy!")
 		Return 0
 	EndIf
-	SetStashInt(akStashRef,"Busy",1)
-	Int iDataSerial = GetStashInt(akStashRef,"DataSerial") + 1
+	SetStashInt(asUUID,"Busy",1)
+	Int iDataSerial = GetStashInt(asUUID,"DataSerial") + 1
 
 	Actor PlayerREF = Game.GetPlayer()
 	String sSessionID = GetSessionStr("SessionID")
@@ -370,19 +517,19 @@ Int Function ExportStashItems(ObjectReference akStashRef) Global
 	vSS_StashManager StashManager = Quest.GetQuest("vSS_StashManagerQuest") as vSS_StashManager
 
 	EffectShader    kContainerShader 	= StashManager.ContainerFXShader
-	kContainerShader.Stop(akStashRef)
-	kContainerShader.Play(akStashRef)
+	kContainerShader.Stop(kStashRef)
+	kContainerShader.Play(kStashRef)
 
-	String sStashID = SuperStash.GetStashNameString(akStashRef)
+	String sStashID = SuperStash.GetStashNameString(kStashRef)
 
-	Int jStashState = ScanContainer(akStashRef)
+	Int jStashState = ScanContainer(kStashRef)
 
-	Int iEntryCount = JArray.Count(JMap.GetObj(jStashState,"containerEntries")) + JArray.Count(JMap.GetObj(jStashState,"entryDataList"))
+	Int iEntryCount = GetStashEntryCount(asUUID)
 	
-	DebugTraceAPIStash("Updated Stash " + akStashRef + ", found " + iEntryCount + " entries!")
+	DebugTraceAPIStash("Updated Stash " + kStashRef + ", found " + iEntryCount + " entries! UUID: " + asUUID)
 
-	SetStashInt(akStashRef,"DataSerial",iDataSerial)
-	SetStashSessionInt(akStashRef,"DataSerial",iDataSerial)
+	SetStashInt(asUUID,"DataSerial",iDataSerial)
+	SetStashSessionInt(asUUID,"DataSerial",iDataSerial)
 
 	Int jKeyList = JMap.AllKeys(jStashState)
 	Int i = JArray.Count(jKeyList)
@@ -390,42 +537,42 @@ Int Function ExportStashItems(ObjectReference akStashRef) Global
 		i -= 1
 		String sKey = JArray.GetStr(jKeyList,i)
 		If sKey
-			SetStashObj(akStashRef,sKey,JMap.GetObj(jStashState,sKey))
+			SetStashObj(asUUID,sKey,JMap.GetObj(jStashState,sKey))
 		EndIf
 	EndWhile
 
-	;SetStashObj(akStashRef,"ContainerState",jStashState)
-	SetStashStr(akStashRef,"LastSessionID",sSessionID)
-	SetStashFlt(akStashRef,"LastSessionTime",fSessionTime)
-	SetStashForm(akStashRef,"Form",akStashRef)
-	SetStashInt(akStashRef,"FormID",akStashRef.GetFormID())
-	SetStashStr(akStashRef,"FormIDString",GetFormIDString(akStashRef))
-	SetStashStr(akStashRef,"Source",SuperStash.GetSourceMod(akStashRef))
+	;SetStashObj(asUUID,"ContainerState",jStashState)
+	SetStashStr(asUUID,"LastSessionID",sSessionID)
+	SetStashFlt(asUUID,"LastSessionTime",fSessionTime)
+	SetStashForm(asUUID,"Form",kStashRef)
+	SetStashInt(asUUID,"FormID",kStashRef.GetFormID())
+	SetStashStr(asUUID,"FormIDString",GetFormIDString(kStashRef))
+	SetStashStr(asUUID,"Source",SuperStash.GetSourceMod(kStashRef))
 
-	String sCellName = akStashRef.GetParentCell().GetName()
+	String sCellName = kStashRef.GetParentCell().GetName()
 	If sCellName
-		SetStashStr(akStashRef,"CellName",sCellName)
+		SetStashStr(asUUID,"CellName",sCellName)
 	Else
-		SetStashStr(akStashRef,"CellName","Unnamed Cell")
+		SetStashStr(asUUID,"CellName","Unnamed Cell")
 	EndIf
 
-	String sStashName = akStashRef.GetName()
+	String sStashName = kStashRef.GetName()
 	If !sStashName
-		sStashName = akStashRef.GetBaseObject().GetName()
+		sStashName = kStashRef.GetBaseObject().GetName()
 	EndIf
 
 	If sStashName
-		SetStashStr(akStashRef,"StashName",sStashName)
+		SetStashStr(asUUID,"StashName",sStashName)
 	Else 
-		SetStashStr(akStashRef,"StashName","Unnamed container")
+		SetStashStr(asUUID,"StashName","Unnamed container")
 	EndIf
 
-	;kContainerShader.Stop(akStashRef)
-	akStashRef.BlockActivation(False)
-	SetStashInt(akStashRef,"Busy",0)
+	;kContainerShader.Stop(kStashRef)
+	kStashRef.BlockActivation(False)
+	SetStashInt(asUUID,"Busy",0)
 
 	SuperStash.RotateFile(SuperStash.userDirectory() + "Stashes/" + sStashID + ".json")
-	JValue.WriteToFile(GetStashJMap(akStashRef),SuperStash.userDirectory() + "Stashes/" + sStashID + ".json")
+	JValue.WriteToFile(GetStashJMap(asUUID),SuperStash.userDirectory() + "Stashes/" + sStashID + ".json")
 	JValue.CleanPool("vSS_ScanState")
 	Return iEntryCount
 EndFunction
