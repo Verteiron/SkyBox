@@ -577,9 +577,11 @@ Int Function UpdateStashData(String asUUID) Global
 	Return iEntryCount
 EndFunction
 
-Function ExportStash(String asUUID) Global
+Function ExportStash(String asUUID, Bool abSkipBackup = False) Global
 	String sStashID = GetStashNameString(asUUID)
-	SuperStash.RotateFile(SuperStash.userDirectory() + "Stashes/" + sStashID + ".json")
+	If abSkipBackup
+		SuperStash.RotateFile(SuperStash.userDirectory() + "Stashes/" + sStashID + ".json")
+	EndIf
 	JValue.WriteToFile(GetStashJMap(asUUID),SuperStash.userDirectory() + "Stashes/" + sStashID + ".json")
 EndFunction
 

@@ -221,6 +221,10 @@ State PANEL_STASH_INFO
 
 EndState
 
+State PANEL_STASH_HISTORY
+
+EndState
+
 State OPTION_MENU_STASH_PICKER
 
 	Event OnMenuOpenST()
@@ -258,6 +262,7 @@ State OPTION_INPUT_STASH_NAME
 			SetRegStr("Stashes." + CurrentStashUUID + ".StashName",a_input)
 			SetTitleText("$Properties for " + CurrentStashName)
 			UpdateMCMNames()
+			vSS_API_Stash.ExportStash(CurrentStashUUID,abSkipBackup = True)
 			ForcePageReset()
 		EndIf
 	EndEvent
