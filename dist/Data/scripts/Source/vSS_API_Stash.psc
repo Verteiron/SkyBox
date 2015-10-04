@@ -33,6 +33,9 @@ String Function CreateStashData(ObjectReference akStashRef) Global
 	String sUUID = SuperStash.UUID()
 	JMap.SetStr(jStashJMap,"UUID",sUUID)
 	JMap.SetForm(jStashJMap,"Form",akStashRef)
+	JMap.SetInt(jStashJMap,"FormID",akStashRef.GetFormID())
+	JMap.SetStr(jStashJMap,"FormIDString",SuperStash.GetFormIDString(akStashRef))
+	JMap.SetStr(jStashJMap,"Source",SuperStash.GetSourceMod(akStashRef))
 	
 	;Create Registry entries
 	SetRegObj("Stashes." + sUUID, jStashJMap)
@@ -432,7 +435,7 @@ Int Function LoadStashesForCell(Cell akCell) Global
 		If IsStashRef(kContainer)
 			DebugTraceAPIStash("Found Stash " + kContainer + "!")
 			
-			Int iCount = ImportStashItems(kContainer)
+			Int iCount = ImportStashRefItems(kContainer)
 			;String sFilePath = SuperStash.userDirectory() + "Stashes\\player.json"
 			
 			;Int iCount = SuperStash.FillContainerFromJSON(kContainer,sFilePath)
@@ -443,7 +446,7 @@ Int Function LoadStashesForCell(Cell akCell) Global
 	Return i
 EndFunction
 
-Int Function ImportStashItems(ObjectReference akStashRef) Global
+Int Function ImportStashRefItems(ObjectReference akStashRef) Global
 	If !IsStashRef(akStashRef)
 		DebugTraceAPIStash("ImportStashItems: Error! " + akStashRef + " is not a valid Stash!")
 		Return 0
@@ -455,7 +458,7 @@ Int Function ImportStashItems(ObjectReference akStashRef) Global
 	kContainerShader.Stop(akStashRef)
 	kContainerShader.Play(akStashRef)
 
-	String sStashID  = SuperStash.GetStashNameString(akStashRef)
+	String sStashID  = GetStashNameString(akStashRef)
 	String sFilePath = SuperStash.userDirectory() + "Stashes\\" ;"; <-- fix for highlighting in SublimePapyrus
 	sFilePath += sStashID + ".json" 
 
@@ -466,7 +469,6 @@ Int Function ImportStashItems(ObjectReference akStashRef) Global
 
 	DebugTraceAPIStash("Filling " + akStashRef + " from " + sFilePath + "!")
 	
-	;This very quickly fills the container with all the base forms
 	Return SuperStash.FillContainerFromJson(akStashRef,sFilePath)
 
 EndFunction
@@ -487,16 +489,16 @@ Int Function ScanContainer(ObjectReference akStashRef) Global
 	Return jContainerState
 EndFunction
 
-Int Function ExportStashItems(String asUUID) Global
+Int Function UpdateStashData(String asUUID) Global
 	If !IsStash(asUUID)
-		DebugTraceAPIStash("ExportStashItems: Error! " + asUUID + " is not a valid Stash!")
+		DebugTraceAPIStash("UpdateStashData: Error! " + asUUID + " is not a valid Stash!")
 		Return -1
 	EndIf
 
 	ObjectReference kStashRef = GetStashRefForUUID(asUUID)
 
 	If !kStashRef
-		DebugTraceAPIStash("ExportStashItems: Error! " + kStashRef + " is not a valid Stash ObjectReference!")
+		DebugTraceAPIStash("UpdateStashData: Error! " + kStashRef + " is not a valid Stash ObjectReference!")
 		Return -2
 	EndIf
 
@@ -520,13 +522,7 @@ Int Function ExportStashItems(String asUUID) Global
 	kContainerShader.Stop(kStashRef)
 	kContainerShader.Play(kStashRef)
 
-	String sStashID = SuperStash.GetStashNameString(kStashRef)
-
 	Int jStashState = ScanContainer(kStashRef)
-
-	Int iEntryCount = GetStashEntryCount(asUUID)
-	
-	DebugTraceAPIStash("Updated Stash " + kStashRef + ", found " + iEntryCount + " entries! UUID: " + asUUID)
 
 	SetStashInt(asUUID,"DataSerial",iDataSerial)
 	SetStashSessionInt(asUUID,"DataSerial",iDataSerial)
@@ -544,10 +540,11 @@ Int Function ExportStashItems(String asUUID) Global
 	;SetStashObj(asUUID,"ContainerState",jStashState)
 	SetStashStr(asUUID,"LastSessionID",sSessionID)
 	SetStashFlt(asUUID,"LastSessionTime",fSessionTime)
-	SetStashForm(asUUID,"Form",kStashRef)
-	SetStashInt(asUUID,"FormID",kStashRef.GetFormID())
-	SetStashStr(asUUID,"FormIDString",GetFormIDString(kStashRef))
-	SetStashStr(asUUID,"Source",SuperStash.GetSourceMod(kStashRef))
+
+	Int iEntryCount = GetStashEntryCount(asUUID)
+	SetStashInt(asUUID,"ItemEntryCount",iEntryCount)
+	
+	DebugTraceAPIStash("Scanned Stash " + kStashRef + ", found " + iEntryCount + " entries! UUID: " + asUUID)
 
 	String sCellName = kStashRef.GetParentCell().GetName()
 	If sCellName
@@ -556,29 +553,45 @@ Int Function ExportStashItems(String asUUID) Global
 		SetStashStr(asUUID,"CellName","Unnamed Cell")
 	EndIf
 
-	String sStashName = kStashRef.GetName()
-	If !sStashName
-		sStashName = kStashRef.GetBaseObject().GetName()
-	EndIf
+	If !GetStashStr(asUUID,"StashName")
+		String sStashName = kStashRef.GetName()
+		If !sStashName
+			sStashName = kStashRef.GetBaseObject().GetName()
+		EndIf
 
-	If sStashName
-		SetStashStr(asUUID,"StashName",sStashName)
-	Else 
-		SetStashStr(asUUID,"StashName","Unnamed container")
+		If sStashName
+			SetStashStr(asUUID,"StashName",sStashName)
+		Else 
+			SetStashStr(asUUID,"StashName","Unnamed container")
+		EndIf
 	EndIf
 
 	;kContainerShader.Stop(kStashRef)
 	kStashRef.BlockActivation(False)
 	SetStashInt(asUUID,"Busy",0)
 
-	SuperStash.RotateFile(SuperStash.userDirectory() + "Stashes/" + sStashID + ".json")
-	JValue.WriteToFile(GetStashJMap(asUUID),SuperStash.userDirectory() + "Stashes/" + sStashID + ".json")
 	JValue.CleanPool("vSS_ScanState")
 	Return iEntryCount
 EndFunction
 
+Function ExportStash(String asUUID)
+	String sStashID = GetStashNameString(asUUID)
+	SuperStash.RotateFile(SuperStash.userDirectory() + "Stashes/" + sStashID + ".json")
+	JValue.WriteToFile(GetStashJMap(asUUID),SuperStash.userDirectory() + "Stashes/" + sStashID + ".json")
+EndFunction
+
 Function DebugTraceAPIStash(String sDebugString, Int iSeverity = 0) Global
 	Debug.Trace("vSS/API/Stash: " + sDebugString,iSeverity)
+EndFunction
+
+String Function GetStashNameString(String asUUID) Global
+	ObjectReference kStashRef = GetStashRefForUUID(asUUID)
+	String sModName = SuperStash.GetSourceMod(kStashRef)
+	If sModName
+		Return sModName + "_" + GetFormIDString(kStashRef) + "_" + asUUID
+	Else
+		Return GetFormIDString(kStashRef) + "_" + asUUID
+	EndIf
 EndFunction
 
 String Function GetFormIDString(Form kForm) Global
