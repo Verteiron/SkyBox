@@ -311,7 +311,7 @@ Bool Function DeleteStashRef(ObjectReference akStashRef) Global
 EndFunction
 
 Bool Function IsStashRef(ObjectReference akStashRef) Global
-	If GetStashRefJMap(akStashRef)
+	If akStashRef && GetStashRefJMap(akStashRef)
 		Return True
 	EndIf
 	Return False
@@ -433,7 +433,8 @@ Int Function LoadStashesForCell(Cell akCell) Global
 	While i < iContainerCount
 		ObjectReference kContainer = akCell.GetNthRef(i,28)
 		If IsStashRef(kContainer)
-			DebugTraceAPIStash("Found Stash " + kContainer + "!")
+			String sStashID = GetUUIDForStashRef(kContainer)
+			DebugTraceAPIStash("Found Stash " + kContainer + "! UUID: " + sStashID)
 			
 			Int iCount = ImportStashRefItems(kContainer)
 			;String sFilePath = SuperStash.userDirectory() + "Stashes\\player.json"
@@ -452,15 +453,17 @@ Int Function ImportStashRefItems(ObjectReference akStashRef) Global
 		Return 0
 	EndIf
 
+	String sStashID = GetUUIDForStashRef(akStashRef)
+
 	vSS_StashManager StashManager 		= Quest.GetQuest("vSS_StashManagerQuest") as vSS_StashManager
 
 	EffectShader    kContainerShader 	= StashManager.ContainerFXShader
 	kContainerShader.Stop(akStashRef)
 	kContainerShader.Play(akStashRef)
 
-	String sStashID  = GetStashNameString(akStashRef)
+	String sStashFileName  = GetStashNameString(sStashID)
 	String sFilePath = SuperStash.userDirectory() + "Stashes\\" ;"; <-- fix for highlighting in SublimePapyrus
-	sFilePath += sStashID + ".json" 
+	sFilePath += sStashFileName + ".json" 
 
 	;Create ExtraContainerChanges data for Container
 	Form kGold = Game.GetFormFromFile(0xf,"Skyrim.esm")
@@ -574,7 +577,7 @@ Int Function UpdateStashData(String asUUID) Global
 	Return iEntryCount
 EndFunction
 
-Function ExportStash(String asUUID)
+Function ExportStash(String asUUID) Global
 	String sStashID = GetStashNameString(asUUID)
 	SuperStash.RotateFile(SuperStash.userDirectory() + "Stashes/" + sStashID + ".json")
 	JValue.WriteToFile(GetStashJMap(asUUID),SuperStash.userDirectory() + "Stashes/" + sStashID + ".json")
@@ -585,8 +588,12 @@ Function DebugTraceAPIStash(String sDebugString, Int iSeverity = 0) Global
 EndFunction
 
 String Function GetStashNameString(String asUUID) Global
+	DebugTraceAPIStash("GetStashNameString:      UUID is " + asUUID)
 	ObjectReference kStashRef = GetStashRefForUUID(asUUID)
+	DebugTraceAPIStash("GetStashNameString: kStashRef is " + kStashRef)
 	String sModName = SuperStash.GetSourceMod(kStashRef)
+	DebugTraceAPIStash("GetStashNameString:  sModName is " + sModName)
+	DebugTraceAPIStash("GetStashNameString: FormIDStr is " + GetFormIDString(kStashRef))
 	If sModName
 		Return sModName + "_" + GetFormIDString(kStashRef) + "_" + asUUID
 	Else
@@ -599,4 +606,8 @@ String Function GetFormIDString(Form kForm) Global
 	sResult = kForm as String ; [FormName < (FF000000)>]
 	sResult = StringUtil.SubString(sResult,StringUtil.Find(sResult,"(") + 1,8)
 	Return sResult
+EndFunction
+
+ObjectReference Function GetFormFromString(String asString) Global
+	Return Game.GetFormEx(("0x" + StringUtil.SubString(asString,StringUtil.Find(asString,"(") + 1,8)) as Int) as ObjectReference
 EndFunction
