@@ -23,6 +23,8 @@ Sound 				Property 	vSS_StashDoneLPSM 			Auto
 
 ;=== Variables ===--
 
+Bool _bIsSack
+
 Int _iThreadCount = 0
 
 Int _iSoundInstance = 0
@@ -88,6 +90,7 @@ Event OnStashCreate()
 	EndIf
 	PlayFX()
 	Int iCount = vSS_API_Stash.UpdateStashData(sStashID)
+	vSS_API_Stash.ExportStash(sStashID)
 	Clear()
 	StopFX()
 EndEvent
@@ -109,16 +112,22 @@ Event OnStashOpen()
 	PlayFX()
 	String sStashID = vSS_API_Stash.GetUUIDForStashRef(_SelfRef)
 	Int iCount = vSS_API_Stash.UpdateStashData(sStashID)
+	vSS_API_Stash.ExportStash(sStashID)
 	Clear()
 	StopFX()
 EndEvent
 
 Function PlaceFX(ObjectReference akStashRef)
 	If StringUtil.Find(akStashRef.GetBaseObject().GetName(),"sack") > -1
-		vSS_StashContainerFX.MoveTo(akStashRef,0,0,akStashRef.GetHeight() * 0.1)
-	Else
-		vSS_StashContainerFX.MoveTo(akStashRef,0,0,akStashRef.GetHeight() * 0.6)
+		DebugTrace(_SelfRef + " is a sack!")
+		_bIsSack = True
 	EndIf
+	If _bIsSack
+	 	vSS_StashContainerFX.MoveTo(akStashRef,0,0,-akStashRef.GetHeight() * 0.75)
+	Else
+	 	vSS_StashContainerFX.MoveTo(akStashRef,0,0,-akStashRef.GetHeight() * 0.5)
+	EndIf
+	
 	Float fW = akStashRef.GetWidth()
 	Float fH = akStashRef.GetHeight()
 	Float fL = akStashRef.GetLength()
@@ -129,21 +138,27 @@ Function PlaceFX(ObjectReference akStashRef)
 	If fL > fSize
 		fSize = fL
 	EndIf
-	Float fScale = fSize / 18.0
+	Float fScale = fSize / 182
 	vSS_StashContainerFX.SetScale(fScale)
 	vSS_StashContainerFX.EnableNoWait(True)
 	_iSoundInstance = vSS_StashDoneLPSM.Play(akStashRef)
 EndFunction
 
 Function PlayFX()
-	vSS_StashContainerFX.SetAnimationVariableFloat("fmagicburnamount", 1.0)
+	vSS_StashContainerFX.SetAnimationVariableFloat("fmagicburnamount", 0.25)
+	If _bIsSack
+		vSS_StashContainerFX.TranslateTo(_SelfRef.GetPositionX(),_SelfRef.GetPositionY(),_SelfRef.GetPositionZ() + _SelfRef.GetHeight(),_SelfRef.GetAngleX(),_SelfRef.GetAngleY(),_SelfRef.GetAngleZ(),_SelfRef.GetHeight() / 2.25,0)
+	Else
+		vSS_StashContainerFX.TranslateTo(_SelfRef.GetPositionX(),_SelfRef.GetPositionY(),_SelfRef.GetPositionZ() + _SelfRef.GetHeight() * 0.5,_SelfRef.GetAngleX(),_SelfRef.GetAngleY(),_SelfRef.GetAngleZ(),_SelfRef.GetHeight() / 2,0)
+	EndIf
 	;_kGlow.PlayGamebryoAnimation("mReady",abStartOver = False, afEaseInTime = 5.0)
 EndFunction
 
 Function StopFX()
 	vSS_StashContainerFX.SetAnimationVariableFloat("fmagicburnamount", 0.0)
 	Sound.StopInstance(_iSoundInstance)
-	WaitMenuMode(0.5)
+	Wait(2)
+	vSS_StashContainerFX.StopTranslation()
 	vSS_StashContainerFX.Disable(True)
 	vSS_StashContainerFX.MoveToMyEditorLocation()
 EndFunction
