@@ -17,7 +17,7 @@ Actor 				Property	PlayerREF					Auto
 
 Form 				Property 	MGAugurFX01Static 			Auto
 
-Activator 			Property 	dunKagrenzelFXActivator 	Auto
+ObjectReference		Property 	vSS_StashContainerFX 		Auto
 
 Sound 				Property 	vSS_StashDoneLPSM 			Auto
 
@@ -87,7 +87,7 @@ Event OnStashCreate()
 		DebugTrace("My Stash UUID is " + sStashID)
 	EndIf
 	PlayFX()
-	Int iCount = vSS_API_Stash.ExportStashItems(sStashID)
+	Int iCount = vSS_API_Stash.UpdateStashData(sStashID)
 	Clear()
 	StopFX()
 EndEvent
@@ -108,17 +108,16 @@ Event OnStashOpen()
 	EndWhile
 	PlayFX()
 	String sStashID = vSS_API_Stash.GetUUIDForStashRef(_SelfRef)
-	Int iCount = vSS_API_Stash.ExportStashItems(sStashID)
+	Int iCount = vSS_API_Stash.UpdateStashData(sStashID)
 	Clear()
 	StopFX()
 EndEvent
 
 Function PlaceFX(ObjectReference akStashRef)
-	_kGlow = akStashRef.PlaceAtMe(dunKagrenzelFXActivator, abInitiallyDisabled = True)
 	If StringUtil.Find(akStashRef.GetBaseObject().GetName(),"sack") > -1
-		_kGlow.MoveTo(akStashRef,0,0,akStashRef.GetHeight() * 0.1)
+		vSS_StashContainerFX.MoveTo(akStashRef,0,0,akStashRef.GetHeight() * 0.1)
 	Else
-		_kGlow.MoveTo(akStashRef,0,0,akStashRef.GetHeight() * 0.6)
+		vSS_StashContainerFX.MoveTo(akStashRef,0,0,akStashRef.GetHeight() * 0.6)
 	EndIf
 	Float fW = akStashRef.GetWidth()
 	Float fH = akStashRef.GetHeight()
@@ -131,21 +130,22 @@ Function PlaceFX(ObjectReference akStashRef)
 		fSize = fL
 	EndIf
 	Float fScale = fSize / 18.0
-	_kGlow.SetScale(fScale)
-	_kGlow.EnableNoWait(True)
+	vSS_StashContainerFX.SetScale(fScale)
+	vSS_StashContainerFX.EnableNoWait(True)
 	_iSoundInstance = vSS_StashDoneLPSM.Play(akStashRef)
 EndFunction
 
 Function PlayFX()
-	_kGlow.PlayGamebryoAnimation("mReady",abStartOver = False, afEaseInTime = 5.0)
+	vSS_StashContainerFX.SetAnimationVariableFloat("fmagicburnamount", 1.0)
+	;_kGlow.PlayGamebryoAnimation("mReady",abStartOver = False, afEaseInTime = 5.0)
 EndFunction
 
 Function StopFX()
-	_kGlow.PlayGamebryoAnimation("mCast")
+	vSS_StashContainerFX.SetAnimationVariableFloat("fmagicburnamount", 0.0)
 	Sound.StopInstance(_iSoundInstance)
 	WaitMenuMode(0.5)
-	_kGlow.Disable(True)
-	_kGlow.Delete()
+	vSS_StashContainerFX.Disable(True)
+	vSS_StashContainerFX.MoveToMyEditorLocation()
 EndFunction
 
 ; Event OnItemAdded(Form akBaseItem, int aiItemCount, ObjectReference akItemReference, ObjectReference akSourceContainer)

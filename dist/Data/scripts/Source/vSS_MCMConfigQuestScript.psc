@@ -50,6 +50,7 @@ Event OnConfigInit()
 	CreatePanel("PANEL_STASH_PICKER","$Stash Picker")
 	CreatePanel("PANEL_STASH_OPTIONS","$Stash Options","PANEL_STASH_PICKER")
 	CreatePanel("PANEL_STASH_INFO","$Stash Info","PANEL_STASH_PICKER")
+	CreatePanel("PANEL_STASH_HISTORY","$Stash History","PANEL_STASH_PICKER")
 EndEvent
 
 Event OnConfigOpen()
@@ -100,6 +101,8 @@ State PANEL_STASH_PICKER
 			Return
 		EndIf
 
+		SetTitleText("$Properties for " + CurrentStashName)
+
 		Int jStashData = GetRegObj("Stashes." + CurrentStashUUID)
 
 		ObjectReference kStashRef = JMap.GetForm(jStashData,"Form") as ObjectReference
@@ -117,6 +120,7 @@ State PANEL_STASH_PICKER
 
 		AddTextOption("$Status",sStatus,OPTION_FLAG_DISABLED)
 		AddTextOption("$Item entries",iEntryCount,OPTION_FLAG_DISABLED)
+		AddPanelLinkOption("PANEL_STASH_HISTORY","$History")
 
 		; AddTextOption("Health: " + (vSS_API_Character.GetCharacterAV(CurrentSID,"Health") as Int) + \
 		; 				", Stamina:" + (vSS_API_Character.GetCharacterAV(CurrentSID,"Stamina") as Int) + \
@@ -252,8 +256,8 @@ State OPTION_INPUT_STASH_NAME
 		If a_input != GetRegStr("Stashes." + CurrentStashUUID + ".StashName")
 			CurrentStashName = a_input
 			SetRegStr("Stashes." + CurrentStashUUID + ".StashName",a_input)
-			vSS_API_Stash.CreateMCMLists()
-			_sStashNames = vSS_API_Stash.GetMCMNames()
+			SetTitleText("$Properties for " + CurrentStashName)
+			UpdateMCMNames()
 			ForcePageReset()
 		EndIf
 	EndEvent
@@ -266,6 +270,10 @@ EndEvent
 
 Function DoInit()
 	FillEnums()
+	UpdateMCMNames()	
+EndFunction
+
+Function UpdateMCMNames()
 	vSS_API_Stash.CreateMCMLists()
 	_sStashNames = vSS_API_Stash.GetMCMNames()
 EndFunction
