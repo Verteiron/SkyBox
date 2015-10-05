@@ -103,23 +103,25 @@ State PANEL_STASH_PICKER
 
 		SetTitleText("$Properties for " + CurrentStashName)
 
+		AddHeaderOption(CurrentStashName)
+
 		Int jStashData = GetRegObj("Stashes." + CurrentStashUUID)
 
 		ObjectReference kStashRef = JMap.GetForm(jStashData,"Form") as ObjectReference
 		Int iEntryCount = JArray.Count(JMap.GetObj(jStashData,"containerEntries")) + JArray.Count(JMap.GetObj(jStashData,"entryDataList"))
 
-		SetCursorPosition(aiLeftRight + 6)
+		SetCursorPosition(aiLeftRight + 4)
 		AddInputOptionST("OPTION_INPUT_STASH_NAME","$Stash name",JMap.GetStr(jStashData,"StashName"))
-		AddTextOption("$Location",JMap.GetStr(jStashData,"CellName"),OPTION_FLAG_DISABLED)
-		AddTextOption("$Form ID",JMap.GetStr(jStashData,"FormIDString"),OPTION_FLAG_DISABLED)
+		AddTextOption("$Parent Cell",JMap.GetStr(jStashData,"CellName"))
+		AddTextOption("$Form ID",JMap.GetStr(jStashData,"FormIDString") + " (" + JMap.GetStr(jStashData,"Source") + ")")
 
 		String sStatus = "$Not loaded"
 		If kStashRef
 			sStatus = "$Loaded"
 		EndIf
 
-		AddTextOption("$Status",sStatus,OPTION_FLAG_DISABLED)
-		AddTextOption("$Item entries",iEntryCount,OPTION_FLAG_DISABLED)
+		AddTextOption("$Status",sStatus)
+		AddTextOption("$Item entries",iEntryCount)
 		AddPanelLinkOption("PANEL_STASH_HISTORY","$History")
 
 		; AddTextOption("Health: " + (vSS_API_Character.GetCharacterAV(CurrentSID,"Health") as Int) + \
@@ -222,6 +224,33 @@ State PANEL_STASH_INFO
 EndState
 
 State PANEL_STASH_HISTORY
+
+	Event OnPanelAdd(Int aiLeftRight)
+		SetCursorFillMode(TOP_TO_BOTTOM)
+		
+		SetCursorPosition(aiLeftRight)
+
+		AddHeaderOption("$Backup history")
+	
+		If !CurrentStashUUID
+			DebugTrace("No Stash selected!")
+			Return
+		EndIf
+
+		SetCursorPosition(aiLeftRight + 4)
+
+		Int i = 1
+		While i < 10
+			Int jStashData = vSS_API_Stash.GetStashBackupJMap(CurrentStashUUID,i)
+			If jStashData
+				If i > 1
+					AddEmptyOption()
+				EndIf
+				AddTextOption("$Backup " + i + ", $Item entries: " + JMap.GetInt(jStashData,"ItemEntryCount"),"")
+			EndIf
+			i += 1
+		EndWhile
+	EndEvent
 
 EndState
 

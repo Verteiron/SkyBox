@@ -53,6 +53,17 @@ Int Function GetStashJMap(String asUUID) Global
 	Return 0
 EndFunction
 
+Int Function GetStashBackupJMap(String asUUID, Int aiBackupNum = 1) Global
+	String sStashFileName  = GetStashFileNameString(asUUID)
+	String sFilePath = SuperStash.userDirectory() + "Stashes\\" ;"; <-- fix for highlighting in SublimePapyrus
+	sFilePath += sStashFileName + "." + aiBackupNum + ".json" 
+	Int jStashJMap = JValue.ReadFromFile(sFilePath)
+	If JValue.isMap(jStashJMap)
+		Return jStashJMap
+	EndIf
+	Return 0
+EndFunction
+
 Int Function GetStashRefJMap(ObjectReference akStashRef) Global
 	Int jStashFormMap = GetStashFormMap()
 	Int jStashJMap = JFormMap.GetObj(jStashFormMap,akStashRef)
@@ -96,7 +107,7 @@ Int Function CreateStashSessionJMap(String asUUID = "") Global
 	If !asUUID
 		asUUID = SuperStash.UUID()
 	Else
-		DebugTraceAPIStash("CreateStashSessionJMap: Warning! Creating new Stash JMap based on existing UUID, this may result in data loss! UUID: " + asUUID,1)
+		DebugTraceAPIStash("CreateStashSessionJMap: Creating new Stash Session JMap based on existing UUID! UUID: " + asUUID,1)
 	EndIf
 	JMap.SetStr(jStashJMap,"UUID",asUUID)
 	SetSessionObj("Stashes." + asUUID, jStashJMap)
@@ -461,7 +472,7 @@ Int Function ImportStashRefItems(ObjectReference akStashRef) Global
 	kContainerShader.Stop(akStashRef)
 	kContainerShader.Play(akStashRef)
 
-	String sStashFileName  = GetStashNameString(sStashID)
+	String sStashFileName  = GetStashFileNameString(sStashID)
 	String sFilePath = SuperStash.userDirectory() + "Stashes\\" ;"; <-- fix for highlighting in SublimePapyrus
 	sFilePath += sStashFileName + ".json" 
 
@@ -543,6 +554,7 @@ Int Function UpdateStashData(String asUUID) Global
 	;SetStashObj(asUUID,"ContainerState",jStashState)
 	SetStashStr(asUUID,"LastSessionID",sSessionID)
 	SetStashFlt(asUUID,"LastSessionTime",fSessionTime)
+	SetStashStr(asUUID,"LastCharacterName",Game.GetPlayer().GetActorBase().GetName())
 
 	Int iEntryCount = GetStashEntryCount(asUUID)
 	SetStashInt(asUUID,"ItemEntryCount",iEntryCount)
@@ -578,8 +590,8 @@ Int Function UpdateStashData(String asUUID) Global
 EndFunction
 
 Function ExportStash(String asUUID, Bool abSkipBackup = False) Global
-	String sStashID = GetStashNameString(asUUID)
-	If abSkipBackup
+	String sStashID = GetStashFileNameString(asUUID)
+	If !abSkipBackup
 		SuperStash.RotateFile(SuperStash.userDirectory() + "Stashes/" + sStashID + ".json")
 	EndIf
 	JValue.WriteToFile(GetStashJMap(asUUID),SuperStash.userDirectory() + "Stashes/" + sStashID + ".json")
@@ -589,17 +601,11 @@ Function DebugTraceAPIStash(String sDebugString, Int iSeverity = 0) Global
 	Debug.Trace("vSS/API/Stash: " + sDebugString,iSeverity)
 EndFunction
 
-String Function GetStashNameString(String asUUID) Global
-	DebugTraceAPIStash("GetStashNameString:      UUID is " + asUUID)
-	ObjectReference kStashRef = GetStashRefForUUID(asUUID)
-	DebugTraceAPIStash("GetStashNameString: kStashRef is " + kStashRef)
-	String sModName = SuperStash.GetSourceMod(kStashRef)
-	DebugTraceAPIStash("GetStashNameString:  sModName is " + sModName)
-	DebugTraceAPIStash("GetStashNameString: FormIDStr is " + GetFormIDString(kStashRef))
-	If sModName
-		Return sModName + "_" + GetFormIDString(kStashRef) + "_" + asUUID
+String Function GetStashFileNameString(String asUUID) Global
+	If GetStashStr(asUUID,"Source")
+		Return GetStashStr(asUUID,"Source") + "_" + GetStashStr(asUUID,"FormIDString") + "_" + asUUID
 	Else
-		Return GetFormIDString(kStashRef) + "_" + asUUID
+		Return GetStashStr(asUUID,"FormIDString") + "_" + asUUID
 	EndIf
 EndFunction
 
@@ -610,6 +616,6 @@ String Function GetFormIDString(Form kForm) Global
 	Return sResult
 EndFunction
 
-ObjectReference Function GetFormFromString(String asString) Global
-	Return Game.GetFormEx(("0x" + StringUtil.SubString(asString,StringUtil.Find(asString,"(") + 1,8)) as Int) as ObjectReference
+Form Function GetFormFromString(String asString) Global
+	Return Game.GetFormEx(("0x" + StringUtil.SubString(asString,StringUtil.Find(asString,"(") + 1,8)) as Int) as Form
 EndFunction
