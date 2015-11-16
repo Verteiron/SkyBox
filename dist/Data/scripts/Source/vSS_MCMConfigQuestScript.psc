@@ -24,8 +24,9 @@ String 					Property CurrentStashUUID 				Auto Hidden
 
 ; === Variables ===--
 
-String[] _sStashNames
+String[] 	_sStashNames
 
+Int[] 		_iHistoryOptions
 
 ; === Events/Functions ===--
 
@@ -122,6 +123,7 @@ State PANEL_STASH_PICKER
 
 		AddTextOption("$Status",sStatus)
 		AddTextOption("$Item entries",iEntryCount)
+		AddTextOption("$Last accessed by", JMap.GetStr(jStashData,"LastCharacterName"))
 		AddPanelLinkOption("PANEL_STASH_HISTORY","$History")
 
 		; AddTextOption("Health: " + (vSS_API_Character.GetCharacterAV(CurrentSID,"Health") as Int) + \
@@ -239,14 +241,16 @@ State PANEL_STASH_HISTORY
 
 		SetCursorPosition(aiLeftRight + 4)
 
+		_iHistoryOptions = New Int[10]
+
 		Int i = 1
 		While i < 10
 			Int jStashData = vSS_API_Stash.GetStashBackupJMap(CurrentStashUUID,i)
 			If jStashData
 				If i > 1
-					AddEmptyOption()
+					;AddEmptyOption()
 				EndIf
-				AddTextOption("$Backup " + i + ", $Item entries: " + JMap.GetInt(jStashData,"ItemEntryCount"),"")
+				_iHistoryOptions[i] = AddTextOption("Ver: " + JMap.GetInt(jStashData,"DataSerial") + ", $Entries: " + JMap.GetInt(jStashData,"ItemEntryCount") + ", saved by " + JMap.GetStr(jStashData,"LastCharacterName"),"")
 			EndIf
 			i += 1
 		EndWhile
@@ -300,11 +304,25 @@ EndState
 
 Event OnOptionSelect(int a_option)
 	;A few options really aren't suited for states, so handle them here
+	If _iHistoryOptions.Find(a_option) > -1
+		;History option was picked!
+		Int iRevision = _iHistoryOptions.Find(a_option)
+		If iRevision <= 0
+			DebugTrace("Error: Invalid revision " + iRevision + "!",2)
+			Return
+		EndIF
+		If ShowMessage("$Revert to this state? You may lose any items currently in this Stash!", True)
+			vSS_API_Stash.RevertToBackup(CurrentStashUUID,iRevision)
+			ForcePageReset()
+		EndIf
+	EndIf
 EndEvent
 
 Function DoInit()
 	FillEnums()
-	UpdateMCMNames()	
+	UpdateMCMNames()
+
+	_iHistoryOptions = New Int[10]
 EndFunction
 
 Function UpdateMCMNames()

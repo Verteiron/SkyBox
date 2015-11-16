@@ -64,6 +64,28 @@ Int Function GetStashBackupJMap(String asUUID, Int aiBackupNum = 1) Global
 	Return 0
 EndFunction
 
+Int Function RevertToBackup(String asUUID, Int aiBackupNum = 1) Global
+	Int jStashJMap = GetStashBackupJMap(asUUID,aiBackupNum)
+	If !jStashJMap
+		Return -1
+	EndIf
+	DebugTraceAPIStash("RevertToBackup/ + " + asUUID + ": Reverting to revision " + aiBackupNum + "!")
+	JMap.SetInt(jStashJMap,"DataSerial",GetStashSessionInt(asUUID,"DataSerial") + 1)
+	SetRegObj("Stashes." + asUUID,jStashJMap)
+	ExportStash(asUUID)
+	Utility.WaitMenuMode(0.1)
+	ObjectReference kStashRef = GetStashRefForUUID(asUUID)
+	DebugTraceAPIStash("RevertToBackup/ + " + asUUID + ": ObjectReference is " + kStashRef + "!")
+	If kStashRef
+		If kStashRef.Is3DLoaded()
+			DebugTraceAPIStash("RevertToBackup/ + " + asUUID + ": ObjectReference is loaded, importing item right now!")
+			Int iCount = ImportStashRefItems(kStashRef)
+		EndIf
+	EndIf
+
+	Return 0
+EndFunction
+
 Int Function GetStashRefJMap(ObjectReference akStashRef) Global
 	Int jStashFormMap = GetStashFormMap()
 	Int jStashJMap = JFormMap.GetObj(jStashFormMap,akStashRef)
@@ -458,33 +480,55 @@ Int Function LoadStashesForCell(Cell akCell) Global
 	Return i
 EndFunction
 
-Int Function ImportStashRefItems(ObjectReference akStashRef) Global
+Int Function ImportStashRefItems(ObjectReference akStashRef, Bool abForce = False) Global
 	If !IsStashRef(akStashRef)
 		DebugTraceAPIStash("ImportStashItems: Error! " + akStashRef + " is not a valid Stash!")
 		Return 0
 	EndIf
 
-	String sStashID = GetUUIDForStashRef(akStashRef)
+	Bool bIsEmpty = True
+
+	Int iReturn = 0
 
 	vSS_StashManager StashManager 		= Quest.GetQuest("vSS_StashManagerQuest") as vSS_StashManager
+
+	ObjectReference kTempStash = StashManager.ContainerTemp
+
+	String sStashID = GetUUIDForStashRef(akStashRef)
+	String sStashFileName  = GetStashFileNameString(sStashID)
+	String sFilePath = SuperStash.userDirectory() + "Stashes\\" ;"; <-- fix for highlighting in SublimePapyrus
+	sFilePath += sStashFileName + ".json" 
+
+	Int jStashData = JValue.readFromFile(sFilePath)
+	Int iDataSerial = JValue.SolveInt(jStashData,".DataSerial")
+
+	If GetStashSessionInt(sStashID,"DataSerial") == 0 && akStashRef.GetNthForm(0)
+		Debug.Notification("SuperStash: Stash '" + GetStashStr(sStashID,"StashName") + "' was not empty, contents have been merged!")
+		akStashRef.RemoveAllItems(kTempStash,True,True)
+		bIsEmpty = False 
+	EndIf
 
 	EffectShader    kContainerShader 	= StashManager.ContainerFXShader
 	kContainerShader.Stop(akStashRef)
 	kContainerShader.Play(akStashRef)
 
-	String sStashFileName  = GetStashFileNameString(sStashID)
-	String sFilePath = SuperStash.userDirectory() + "Stashes\\" ;"; <-- fix for highlighting in SublimePapyrus
-	sFilePath += sStashFileName + ".json" 
+	;akStashRef.RemoveAllItems()
+	DebugTraceAPIStash("Saved DataSerial is " + iDataSerial + ", Session DataSerial is " + GetStashSessionInt(sStashID,"DataSerial"))
+	If iDataSerial > GetStashSessionInt(sStashID,"DataSerial") || abForce
+		;Create ExtraContainerChanges data for Container
+		Form kGold = Game.GetFormFromFile(0xf,"Skyrim.esm")
+		akStashRef.AddItem(kGold, 1, True)
+		akStashRef.RemoveItem(kGold, 1, True)
+		akStashRef.RemoveAllItems(None)
+		DebugTraceAPIStash("Filling " + akStashRef + " from " + sFilePath + "!")
+		SetStashSessionInt(sStashID,"DataSerial",iDataSerial)
+		iReturn = SuperStash.FillContainerFromJson(akStashRef,sFilePath)
+		If !bIsEmpty
+			kTempStash.RemoveAllItems(akStashRef,True,True)
+		EndIf
+	EndIf
 
-	;Create ExtraContainerChanges data for Container
-	Form kGold = Game.GetFormFromFile(0xf,"Skyrim.esm")
-	akStashRef.AddItem(kGold, 1, True)
-	akStashRef.RemoveItem(kGold, 1, True)
-
-	DebugTraceAPIStash("Filling " + akStashRef + " from " + sFilePath + "!")
-	
-	Return SuperStash.FillContainerFromJson(akStashRef,sFilePath)
-
+	Return iReturn
 EndFunction
 
 ;For anyone reading this, I had this whole scan working perfectly in pure Papyrus. It was beautiful.
