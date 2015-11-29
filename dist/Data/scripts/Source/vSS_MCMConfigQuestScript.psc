@@ -73,7 +73,7 @@ Event OnPageReset(string a_page)
 		SetTitleText(Pages[0])
 		If !TopPanel()
 			PushPanel("PANEL_STASH_PICKER")
-			PushPanel("PANEL_STASH_INFO")
+			PushPanel("PANEL_STASH_HISTORY")
 		EndIf
 		DisplayPanels()
 	ElseIf a_page == Pages[7]
@@ -102,7 +102,7 @@ State PANEL_STASH_PICKER
 			Return
 		EndIf
 
-		SetTitleText("$Properties for " + CurrentStashName)
+		SetTitleText("$Stash Properties")
 
 		AddHeaderOption(CurrentStashName)
 
@@ -124,58 +124,15 @@ State PANEL_STASH_PICKER
 		AddTextOption("$Status",sStatus)
 		AddTextOption("$Item entries",iEntryCount)
 		AddTextOption("$Last accessed by", JMap.GetStr(jStashData,"LastCharacterName"))
-		AddPanelLinkOption("PANEL_STASH_HISTORY","$History")
-
-		; AddTextOption("Health: " + (vSS_API_Character.GetCharacterAV(CurrentSID,"Health") as Int) + \
-		; 				", Stamina:" + (vSS_API_Character.GetCharacterAV(CurrentSID,"Stamina") as Int) + \
-		; 				", Magicka:" + (vSS_API_Character.GetCharacterAV(CurrentSID,"Magicka") as Int), "",OPTION_FLAG_DISABLED)
-
-		; String sWeaponName = vSS_API_Item.GetItemName(vSS_API_Character.GetCharacterEquippedFormID(CurrentSID,1))
-		; String sLWeaponName = vSS_API_Item.GetItemName(vSS_API_Character.GetCharacterEquippedFormID(CurrentSID,0))
-		; If sLWeaponName && sLWeaponName != sWeaponName
-		; 	sWeaponName += " and " + sLWeaponName
-		; ElseIf sLWeaponName && sLWeaponName == sWeaponName
-		; 	sWeaponName += " (Both)"
-		; EndIf
-		; AddTextOption("Wielding " + sWeaponName,"",OPTION_FLAG_DISABLED)
-		; ; AddEmptyOption()
-		; ; String sActorBaseString = "Not loaded"
-		; ; String sActorString 	= "Not loaded"
-		; ; Actor kActor = vSS_API_Doppelganger.GetActorForSID(CurrentSID)
-		; ; If kActor 
-		; ; 	sActorBaseString 	= GetFormIDString(kActor.GetActorBase())
-		; ; 	sActorString 		= GetFormIDString(kActor)
-		; ; EndIf
-		; ; AddTextOption("ActorBase: " + sActorBaseString,"",OPTION_FLAG_DISABLED)
-		; ; AddTextOption("Actor: " + sActorString,"",OPTION_FLAG_DISABLED)
-		
-		; AddPanelLinkOption("PANEL_STASH_OPTIONS_BEHAVIOR","$Faction and behavior")
-		; AddPanelLinkOption("PANEL_STASH_OPTIONS_STATS","$Skills and stats")
-		
-		
-		; If !vSS_API_Doppelganger.GetActorForSID(CurrentSID)
-		; 	AddEmptyOption()
-		; 	AddTextOptionST("OPTION_TEXT_STASH_SUMMON", "Summon me", "right now!")
-		; EndIf
+		;AddPanelLinkOption("PANEL_STASH_HISTORY","$History")
+		AddEmptyOption()
+		AddTextOptionST("OPTION_TEXT_DESTROY_STASH","$Destroy this stash", "")
 	EndEvent
 EndState
 
 State PANEL_STASH_OPTIONS
 
 	Event OnPanelAdd(Int aiLeftRight)
-
-		; SetCursorFillMode(TOP_TO_BOTTOM)
-		
-		; SetCursorPosition(aiLeftRight)
-
-		; Int OptionFlags = 0
-
-		; AddHeaderOption(CurrentCharacterName + " Options")
-
-		; ;AddToggleOptionST("OPTION_TOGGLE_STASH_TRACKING","$Track this character", GetCharConfigBool(CurrentSID,"Tracking",abUseDefault = True))
-		; AddEmptyOption()
-		
-		; OptionFlags = 0
 
 	EndEvent
 
@@ -184,43 +141,6 @@ EndState
 State PANEL_STASH_INFO
 
 	Event OnPanelAdd(Int aiLeftRight)
-; === Begin info column ===--
-		; If !CurrentSID 
-		; 	Return
-		; EndIf
-		; SetCursorPosition(aiLeftRight + 6)
-		
-		; String[] sSex 	= New String[2]
-		; sSex[0] 		= "Male"
-		; sSex[1] 		= "Female"
-
-		; AddTextOption("Level " + (vSS_API_Character.GetCharacterLevel(CurrentSID) as Int) + " " + (vSS_API_Character.GetCharacterStr(CurrentSID,".Info.RaceText")) + " " + sSex[vSS_API_Character.GetCharacterSex(CurrentSID)],"",OPTION_FLAG_DISABLED)
-
-		; AddTextOption("Health: " + (vSS_API_Character.GetCharacterAV(CurrentSID,"Health") as Int) + \
-		; 				", Stamina:" + (vSS_API_Character.GetCharacterAV(CurrentSID,"Stamina") as Int) + \
-		; 				", Magicka:" + (vSS_API_Character.GetCharacterAV(CurrentSID,"Magicka") as Int), "",OPTION_FLAG_DISABLED)
-
-		; String sWeaponName = vSS_API_Item.GetItemName(vSS_API_Character.GetCharacterEquippedFormID(CurrentSID,1))
-		; String sLWeaponName = vSS_API_Item.GetItemName(vSS_API_Character.GetCharacterEquippedFormID(CurrentSID,0))
-		; If sLWeaponName && sLWeaponName != sWeaponName
-		; 	sWeaponName += " and " + sLWeaponName
-		; ElseIf sLWeaponName && sLWeaponName == sWeaponName
-		; 	sWeaponName += " (Both)"
-		; EndIf
-		; AddTextOption("Wielding " + sWeaponName,"",OPTION_FLAG_DISABLED)
-		; AddEmptyOption()
-		; String sActorBaseString = "Not loaded"
-		; String sActorString 	= "Not loaded"
-		; Actor kActor = vSS_API_Doppelganger.GetActorForSID(CurrentSID)
-		; If kActor 
-		; 	sActorBaseString 	= GetFormIDString(kActor.GetActorBase())
-		; 	sActorString 		= GetFormIDString(kActor)
-		; EndIf
-		; AddTextOption("ActorBase: " + sActorBaseString,"",OPTION_FLAG_DISABLED)
-		; AddTextOption("Actor: " + sActorString,"",OPTION_FLAG_DISABLED)
-
-		
-		;===== END info column =============----
 	EndEvent
 
 EndState
@@ -250,7 +170,7 @@ State PANEL_STASH_HISTORY
 				If i > 1
 					;AddEmptyOption()
 				EndIf
-				_iHistoryOptions[i] = AddTextOption("Ver: " + JMap.GetInt(jStashData,"DataSerial") + ", $Entries: " + JMap.GetInt(jStashData,"ItemEntryCount") + ", saved by " + JMap.GetStr(jStashData,"LastCharacterName"),"")
+				_iHistoryOptions[i] = AddTextOption("Ver: " + JMap.GetInt(jStashData,"DataSerial") + ", {$Entries}: " + JMap.GetInt(jStashData,"ItemEntryCount") + ", saved by " + JMap.GetStr(jStashData,"LastCharacterName"),"")
 			EndIf
 			i += 1
 		EndWhile
@@ -293,9 +213,24 @@ State OPTION_INPUT_STASH_NAME
 		If a_input != GetRegStr("Stashes." + CurrentStashUUID + ".StashName")
 			CurrentStashName = a_input
 			SetRegStr("Stashes." + CurrentStashUUID + ".StashName",a_input)
-			SetTitleText("$Properties for " + CurrentStashName)
+			;SetTitleText("{$Properties for} " + CurrentStashName)
 			UpdateMCMNames()
 			vSS_API_Stash.ExportStash(CurrentStashUUID,abSkipBackup = True)
+			ForcePageReset()
+		EndIf
+	EndEvent
+
+EndState
+
+State OPTION_TEXT_DESTROY_STASH
+
+	Event OnSelectST()
+		;Confirm this 
+		If ShowMessage("$Destroy Stash", True)
+			vSS_API_Stash.RemoveStash(CurrentStashUUID)
+			CurrentStashUUID = ""
+			CurrentStashName = ""
+			UpdateMCMNames()
 			ForcePageReset()
 		EndIf
 	EndEvent
@@ -332,57 +267,6 @@ EndFunction
 
 Function FillEnums()
 
-	; ENUM_STASH_ARMORCHECK 				= New String[3]
-	; ENUM_STASH_ARMORCHECK[0]					= "$When missing"
-	; ENUM_STASH_ARMORCHECK[1]					= "$Always"
-	; ENUM_STASH_ARMORCHECK[2]					= "$Disable"
-
-	; ENUM_GLOBAL_MAGIC_OVERRIDES			= New String[3]
-	; ENUM_GLOBAL_MAGIC_OVERRIDES[0]			= "$None"
-	; ENUM_GLOBAL_MAGIC_OVERRIDES[1]			= "$Healing"
-	; ENUM_GLOBAL_MAGIC_OVERRIDES[2]			= "$Healing/Defense"
-
-	; ENUM_GLOBAL_MAGIC_ALLOWFROMMODS		= New String[3]
-	; ENUM_GLOBAL_MAGIC_ALLOWFROMMODS[0]		= "$Vanilla only"
-	; ENUM_GLOBAL_MAGIC_ALLOWFROMMODS[1]		= "$Select mods"
-	; ENUM_GLOBAL_MAGIC_ALLOWFROMMODS[2]		= "$All mods"
-	
-	; ENUM_GLOBAL_SHOUTS_HANDLING			= New String[5]
-	; ENUM_GLOBAL_SHOUTS_HANDLING[0]			= "$All"
-	; ENUM_GLOBAL_SHOUTS_HANDLING[1]			= "$All but CS"
-	; ENUM_GLOBAL_SHOUTS_HANDLING[2]			= "$All but DA"
-	; ENUM_GLOBAL_SHOUTS_HANDLING[3]			= "$All but CS/DA"
-	; ENUM_GLOBAL_SHOUTS_HANDLING[4]			= "$No Shouts"
-	
-	; ENUM_GLOBAL_FILE_LOCATION			= New String[2]
-	; ENUM_GLOBAL_FILE_LOCATION[0]			= "$Data/vSS"
-	; ENUM_GLOBAL_FILE_LOCATION[1]			= "$My Games/Skyrim"
-	
-
-	; ENUM_STASH_PLAYERRELATIONSHIP		= New String[5]
-	; ENUM_STASH_PLAYERRELATIONSHIP[0]			= "$Archenemy"
-	; ENUM_STASH_PLAYERRELATIONSHIP[1]			= "$Neutral"
-	; ENUM_STASH_PLAYERRELATIONSHIP[2]			= "$Friendly"
-	; ENUM_STASH_PLAYERRELATIONSHIP[3]			= "$Follower"
-	; ENUM_STASH_PLAYERRELATIONSHIP[4]			= "$CanMarry"
-
-	; ENUM_STASH_CONFIDENCE				= New String[5]
-	; ENUM_STASH_CONFIDENCE[0]					= "$Coward"
-	; ENUM_STASH_CONFIDENCE[1]					= "$Cautious"
-	; ENUM_STASH_CONFIDENCE[2]					= "$Average"
-	; ENUM_STASH_CONFIDENCE[3]					= "$Brave"
-	; ENUM_STASH_CONFIDENCE[4]					= "$Foolhardy"
-
-	; ENUM_STASH_AGGRESSION				= New String[4]
-	; ENUM_STASH_AGGRESSION[0]					= "$Passive"
-	; ENUM_STASH_AGGRESSION[1]					= "$Aggressive"
-	; ENUM_STASH_AGGRESSION[2]					= "$Very Aggressive"
-	; ENUM_STASH_AGGRESSION[3]					= "$Frenzied"
-
-	; ENUM_STASH_ASSISTANCE				= New String[3]
-	; ENUM_STASH_ASSISTANCE[0]					= "$Helps nobody"
-	; ENUM_STASH_ASSISTANCE[1]					= "$Helps friends"
-	; ENUM_STASH_ASSISTANCE[2]					= "$Helps friends/allies"
 EndFunction
 
 ; === Utility functions ===--

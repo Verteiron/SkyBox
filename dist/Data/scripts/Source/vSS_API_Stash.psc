@@ -339,8 +339,30 @@ Bool Function CreateStashRef(ObjectReference akStashRef, Int aiStashGroup = 0) G
 	Return False
 EndFunction
 
-Bool Function DeleteStashRef(ObjectReference akStashRef) Global
-	Return JFormMap.RemoveKey(GetStashFormMap(),akStashRef)
+Bool Function RemoveStash(String asUUID) Global
+	If !IsStash(asUUID)
+		DebugTraceAPIStash("Error! " + asUUID + " is not a Stash!")
+		Return False
+	EndIf
+	ObjectReference kStashRef = GetStashRefForUUID(asUUID)
+	JMap.RemoveKey(GetRegObj("Stashes"),asUUID)
+	JFormMap.RemoveKey(GetRegObj("StashFormMap"),kStashRef)
+	SaveReg()
+
+	Return True
+EndFunction
+
+Bool Function RemoveStashRef(ObjectReference akStashRef) Global
+	If !IsStashRef(akStashRef)
+		DebugTraceAPIStash("Error! " + akStashRef + " is not a Stash!")
+		Return False
+	EndIf
+	String sStashID = GetUUIDForStashRef(akStashRef)
+	JMap.RemoveKey(GetRegObj("Stashes"),sStashID)
+	JFormMap.RemoveKey(GetRegObj("StashFormMap"),akStashRef)
+	SaveReg()
+
+	Return True
 EndFunction
 
 Bool Function IsStashRef(ObjectReference akStashRef) Global
