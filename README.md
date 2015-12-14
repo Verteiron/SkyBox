@@ -1,5 +1,8 @@
-#Super Stash
-Skyrim mod that allow items to be shared between different playthroughs. Any number of in-game chests can be turned into a Super Stash, which means its contents will be persistent no matter which character you are playing. Download the current build from Releases or from the [Skyrim Nexus](http://www.nexusmods.com/skyrim/mods/54509).
+#SkyBox
+Skyrim mod that allow items to be shared between different playthroughs. Any number of in-game chests can be turned into a Stash, which means its contents will be persistent no matter which character you are playing. This is still in development.
+
+##Why is this not Familiar Faces?
+Because I burned out on FF and needed to do something different for a while. In the process I wanted to completely redo the way FF handles saving and loading data, and SuperStash/SkyBox became my learning project for implementing that. Many features developed for SkyBox have already been backported to FF, and believe me, that's a good thing.
 
 Disclaimer
 ----------
