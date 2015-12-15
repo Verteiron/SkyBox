@@ -15,9 +15,14 @@ Scriptname vSS_API_Item extends vSS_APIBase Hidden
 Import vSS_Registry
 Import vSS_Session
 
-;=== Generic Functions ===--
-
 String Function GetItemName(String asItemID) Global
+{
+/**
+*  @brief 	Return the name of the specified item.
+*  @param 	asItemID The UUID of the requested item.
+*  @return	The name of the item, or an empty string if not found.
+*/
+}
 	DebugTraceAPIItem("Looking up item name for " + asItemID + " ...")
 	String sRet = ""
 	Int jItemInfo = GetItemJMap(asItemID)
@@ -37,6 +42,13 @@ String Function GetItemName(String asItemID) Global
 EndFunction
 
 Int Function GetItemJMap(String asItemID) Global
+{
+/**
+*  @brief 	Return the JMap object of the specified item.
+*  @param 	asItemID The UUID of the requested item.
+*  @return	The JMap ID or -2 if not found.
+*/
+}
 	Int iRet = -2 ; ItemID not present
 	String sRegKey = "Items." + asItemID
 	Int jItemData = GetRegObj(sRegKey)
@@ -47,7 +59,13 @@ Int Function GetItemJMap(String asItemID) Global
 EndFunction
 
 Int Function GetItemInfosForForm(Form akForm) Global
-;Return a JMap of JItemInfos already saved for akForm
+{
+/**
+*  @brief 	Return a JMap of JItemInfos already saved for akForm.
+*  @param 	akForm A form.
+*  @return	A jItemInfoMap. 
+*/
+}
 	Int jItemFMap = GetRegObj("ItemMap")
 	If !JValue.IsFormMap(jItemFMap)
 		SetRegObj("ItemMap",JFormMap.Object())
@@ -62,7 +80,13 @@ Int Function GetItemInfosForForm(Form akForm) Global
 EndFunction
 
 Function SetItemInfosForForm(Form akForm, Int jItemInfoMap) Global
-;Return a JMap of JItemInfos already saved for akForm
+{
+/**
+*  @brief 	Set or create an ItemInfoMap for akForm.
+*  @param 	akForm A form.
+*  @param 	jItemInfoMap The ItemInfoMap to set.
+*/
+}
 	Int jItemFMap = GetRegObj("ItemMap")
 	If !JValue.IsFormMap(jItemFMap)
 		SetRegObj("ItemMap",JFormMap.Object())
@@ -72,8 +96,14 @@ Function SetItemInfosForForm(Form akForm, Int jItemInfoMap) Global
 	SetRegObj("ItemMap",jItemFMap)
 EndFunction
 
-;Retrieve or create an ItemID for ajObjectInfo. If it has been serialized before, it will return its current itemID.
 String Function AssignItemID(Int ajObjectInfo) Global
+{
+/**
+*  @brief 	Retrieve or create an ItemID for ajObjectInfo. If it has been serialized before, it will return its current itemID.
+*  @param 	ajObjectInfo An ObjectInfo JObject.
+*  @return	The assigned ItemID.
+*/
+}
 	Form kForm = JValue.SolveForm(ajObjectInfo,".Form")
 	;Debug.Trace("vSS/API/Item/AssignItemID: Attempting to match item with form " + kForm + "...")
 	Int jItemInfoMap = GetItemInfosForForm(kForm)
@@ -111,6 +141,14 @@ String Function AssignItemID(Int ajObjectInfo) Global
 EndFunction
 
 String Function SaveItem(Int ajObjectInfo, String asItemId = "") Global
+{
+/**
+*  @brief 	Save an item in the registry based on the data in ajObjectInfo.
+*  @param 	ajObjectInfo An ObjectInfo JObject.
+*  @param 	asItemId The desired ItemID for the object.
+*  @return	The assigned ItemID.
+*/
+}
 	If !JValue.IsMap(ajObjectInfo)
 		Return ""
 	EndIf
@@ -145,9 +183,14 @@ String Function SaveItem(Int ajObjectInfo, String asItemId = "") Global
 	Return sItemID
 EndFunction
 
-;Serialize an objectReference if it is customized
 String Function SerializeObject(ObjectReference akObject) Global
-	
+{
+/**
+*  @brief 	Serialize an objectReference if it is customized.
+*  @param 	akObject The ObjectReference to serialize.
+*  @return	A string containing the JSON serialization of akObject.
+*/
+}
 	Form kItem = akObject.GetBaseObject()
 	If kItem as Weapon || kItem as Armor
 		Return SerializeEquipment(akObject)
@@ -160,6 +203,13 @@ String Function SerializeObject(ObjectReference akObject) Global
 EndFunction
 
 String Function SerializeEquipment(ObjectReference akObject) Global
+{
+/**
+*  @brief 	Serialize weapons and armor if it is customized.
+*  @param 	akObject The ObjectReference to serialize.
+*  @return	A string containing the JSON serialization of akObject.
+*/
+}
 	Form kItem = akObject.GetBaseObject()
 	
 	ObjectReference kBaseObject = akObject.PlaceAtMe(kItem,abInitiallyDisabled = True)
@@ -282,7 +332,13 @@ String Function SerializeEquipment(ObjectReference akObject) Global
 EndFunction
 
 ObjectReference Function CreateObject(String asItemID) Global
-{Recreate an item from scratch using its ItemID.}
+{
+/**
+*  @brief 	Recreate an item from scratch using its ItemID.
+*  @param 	asItemID The ItemID of the object to create.
+*  @return	The newly created ObjectReference, or None.
+*/
+}
 	Int jItem = GetItemJMap(asItemID)
 	If jItem <= 0
 		DebugTraceAPIItem("CreateObject: " + asItemID + " is not a valid ItemID!",1)
@@ -296,7 +352,13 @@ ObjectReference Function CreateObject(String asItemID) Global
 EndFunction
 
 ObjectReference Function CreateObjectFromJObj(Int ajObjectInfo) Global
-{Recreate an item from scratch using an appropriate JContainers object.}
+{
+/**
+*  @brief 	Recreate an item from scratch using an appropriate JContainers object.
+*  @param 	ajObjectInfo An ObjectInfo JObject.
+*  @return	The newly created ObjectReference, or None.
+*/
+}
 	Int jItem = ajObjectInfo
 	
 	Form kItem = JMap.getForm(jItem,"Form")
@@ -329,7 +391,14 @@ ObjectReference Function CreateObjectFromJObj(Int ajObjectInfo) Global
 EndFunction
 
 ObjectReference Function CustomizeEquipment(String asItemID, ObjectReference akObject) Global
-{Apply the customization information from the JObject referenced by asItemID to akObject.}
+{
+/**
+*  @brief 	Apply the customization information from the JObject referenced by asItemID to akObject.
+*  @param 	asItemID The ItemID of the object to create.
+*  @param 	akObject The ObjectReference to customize.
+*  @return	The customized ObjectReference.
+*/
+}
 	Int jItem = GetItemJMap(asItemID)
 	If jItem <= 0
 		DebugTraceAPIItem("CustomizeEquipment: " + asItemID + " does not refer to a valid saved object!",1)
@@ -341,7 +410,14 @@ ObjectReference Function CustomizeEquipment(String asItemID, ObjectReference akO
 EndFunction
 
 ObjectReference Function CustomizeObjectFromJObj(Int ajItemInfo, ObjectReference akObject) Global
-{Apply the customization information from ajItemInfo to akObject.}
+{
+/**
+*  @brief 	Apply the customization information from ajItemInfo to akObject.
+*  @param 	ajItemInfo An ObjectInfo JObject.
+*  @param 	akObject The ObjectReference to customize.
+*  @return	The newly customized ObjectReference.
+*/
+}
 	ObjectReference kObject = akObject
 	Int jItem = ajItemInfo
 
@@ -364,7 +440,14 @@ ObjectReference Function CustomizeObjectFromJObj(Int ajItemInfo, ObjectReference
 EndFunction
 
 ObjectReference Function CustomizeEquipmentFromJObj(Int ajItemInfo, ObjectReference akObject) Global
-{Apply the customization information from ajItemInfo to weapon or armor akObject.}
+{
+/**
+*  @brief 	Apply the customization information from ajItemInfo to weapon or armor akObject.
+*  @param 	ajItemInfo An ObjectInfo JObject.
+*  @param 	akObject The ObjectReference to customize.
+*  @return	The newly customized ObjectReference.
+*/
+}
 	ObjectReference kObject = akObject
 	Int jItem = ajItemInfo
 	; Form kItem = JMap.getForm(jItem,"Form")
@@ -417,9 +500,12 @@ EndFunction
 
 String Function SerializePotion(Form akItem) Global
 {
-	Serialize a custom potion and return its new ItemID.
+/**
+*  @brief 	Serialize a custom potion and return its new ItemID.
+*  @param 	akItem The Potion or Poison to serialize.
+*  @return	A string containing the JSON serialization of akItem.
+*/
 }
-
 	Potion kPotion = akItem as Potion
 	JMap.SetForm(jPotionInfo,"Form",akItem)
 	If !akItem as Potion
@@ -457,8 +543,13 @@ String Function SerializePotion(Form akItem) Global
 EndFunction
 
 Potion Function CreatePotionFromPotionData(Int jPotionData) Global
-{Create a custom potion using jPotionData.}
-
+{
+/**
+*  @brief 	Create a custom potion using jPotionData.
+*  @param 	jPotionData A PotionData JObject.
+*  @return	The newly created Potion.
+*/
+}
 	Float[] fMagnitudes = New Float[4]
 	Int[] iDurations = New Int[4]
 	Int[] iAreas = New Int[4]
@@ -484,9 +575,13 @@ Potion Function CreatePotionFromPotionData(Int jPotionData) Global
 EndFunction
 
 ObjectReference Function CreatePotion(String asItemID) Global
-{Recreate a custom potion using jPotionInfo.}
-;FIXME: This won't work because there is no SetNthMagicEffect!
-
+{
+/**
+*  @brief 	Recreate a custom potion using the data from asItemID.
+*  @param 	asItemID The ItemID of the potion.
+*  @return	The newly created Potion.
+*/
+}
 	Int jPotionInfo = GetItemJMap(asItemID)
 	Potion kDefaultPotion = Game.GetformFromFile(0x0005661f,"Skyrim.esm") as Potion
 	Potion kDefaultPoison = Game.GetformFromFile(0x0005629e,"Skyrim.esm") as Potion
@@ -518,11 +613,25 @@ ObjectReference Function CreatePotion(String asItemID) Global
 EndFunction
 
 Form Function GetExistingObject(String asItemID) Global
+{
+/**
+*  @brief 	Return an existing reference to the object in asItemID, if it exists.
+*  @param 	asItemID The ItemID to look up.
+*  @return	An existing Form, if it exists, otherwise None.
+*/
+}
 	Int jItemIDMap 		= GetSessionObj("Items.IDMap")
 	Return JMap.GetForm(jItemIDMap,asItemID)
 EndFunction
 
 String Function GetObjectID(ObjectReference akObject) Global
+{
+/**
+*  @brief 	Return the ItemID for an ObjectReference, if one exists.
+*  @param 	akObject The ObjectReference to look up.
+*  @return	The ItemID of an already serialized Form, or an empty string.
+*/
+}
 	Int jItemIDMap 		= GetSessionObj("Items.IDMap")
 	Int jItemIDArray 	= JMap.AllKeys(jItemIDMap)
 	Int jObjectArray 	= JMap.AllValues(jItemIDMap)
@@ -534,6 +643,13 @@ String Function GetObjectID(ObjectReference akObject) Global
 EndFunction
 
 Function SetObjectID(ObjectReference akObject, String asItemID) Global
+{
+/**
+*  @brief 	Set the ItemID for an ObjectReference, creating an ItemIDMap if one does not exist.
+*  @param 	akObject The target ObjectReference.
+*  @param 	asItemID The ItemID to set.
+*/
+}
 	Int jItemIDMap 		= GetSessionObj("Items.IDMap")
 	If !JValue.IsMap(jItemIDMap)
 		jItemIDMap = JMap.Object()
@@ -544,10 +660,24 @@ Function SetObjectID(ObjectReference akObject, String asItemID) Global
 EndFunction
 
 Function DebugTraceAPIItem(String sDebugString, Int iSeverity = 0) Global
+{
+/**
+*  @brief 	Wrapper for Debug.Trace that makes it easy to read in the log file. 
+*  @param 	sDebugString The text to log.
+*  @param 	iSeverity 0 = Info, 1 = Warn, 2 = Error.
+*/
+}
 	Debug.Trace("vSS/API/Item: " + sDebugString,iSeverity)
 EndFunction
 
 String Function GetFormIDString(Form kForm) Global
+{
+/**
+*  @brief 	Return a nicely formatted FormID string.
+*  @param 	kForm Form to get the FormID of.
+*  @return 	String containing the FormID.
+*/
+}
 	String sResult
 	sResult = kForm as String ; [FormName < (FF000000)>]
 	sResult = StringUtil.SubString(sResult,StringUtil.Find(sResult,"(") + 1,8)
