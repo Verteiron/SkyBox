@@ -61,38 +61,38 @@ Customized items are created when the Stash is first loaded, and are recreated w
 
 ##FAQ
 
-Q. What happens if my other characters are already using the Stash container I just created?
-A. The items will be merged with existing ones, but for safety it's best if you pick containers that are empty. 
+**Q.** What happens if my other characters are already using the Stash container I just created?  
+**A.** The items will be merged with existing ones, but for safety it's best if you pick containers that are empty. 
 
-Q. What if the Stash's container isn't available in one of my saves? 
-A. It won't cause any problems, but you won't be able to access it with that character until it *is* available.
+**Q.** What if the Stash's container isn't available in one of my saves?   
+**A.** It won't cause any problems, but you won't be able to access it with that character until it *is* available.  
 
-Q. Can I make Stashes out of containers from other mods?
-A. Yes, but don't forget and uninstall the mod while the Stash is active, as you'll probably lose any items you have in it.
+**Q.** Can I make Stashes out of containers from other mods?  
+**A.** Yes, but don't forget and uninstall the mod while the Stash is active, as you'll probably lose any items you have in it.  
 
-Q. Is Skybox compatible with mods that link multiple containers together?
-A. Almost certainly not. If you want to try it, be my guest, but I don't think it will end well. Most of these types of mods work by using a hidden container in some other location. If you made *that* container a Stash, it might sort-of work, but I haven't tried this and you probably shouldn't, either.
+**Q.** Is Skybox compatible with mods that link multiple containers together?  
+**A.** Almost certainly not. If you want to try it, be my guest, but I don't think it will end well. Most of these types of mods work by using a hidden container in some other location. If you made *that* container a Stash, it might sort-of work, but I haven't tried this and you probably shouldn't, either.  
 
-Q. I LOST AN ITEM! WHAT DO I DO?
-A. First, calm down. If you still have a savegame with the item, you're fine, just load it up and put the item back in the Stash without saving. If you don't (how did that even happen?), go to the MCM, find the Stash you were using, and revert it to a version that you know still has the missing item. If none of the revisions have it, then... you may be out of luck. The item itself should be stored as a json file, but you'll have to re-add it to the Stash file by hand, as there's no in-game method to do this yet.
+**Q.** I LOST AN ITEM! WHAT DO I DO?  
+**A.** First, calm down. If you still have a savegame with the item, you're fine, just load it up and put the item back in the Stash without saving. If you don't (how did that even happen?), go to the MCM, find the Stash you were using, and revert it to a version that you know still has the missing item. If none of the revisions have it, then... you may be out of luck. The item itself should be stored as a json file, but you'll have to re-add it to the Stash file by hand, as there's no in-game method to do this yet.  
 
-Q. When do Stashes get saved?
-A. Any time the container's inventory menu is closed. In other words, if you open a Stash, look at it, and close it again, it will save a new revision even if you didn't add or remove anything. This may change in a future version, but I'm avoiding a script threading bug that can occur when a lot of items are added or removed at once.
+**Q.** When do Stashes get saved?  
+**A.** Any time the container's inventory menu is closed. In other words, if you open a Stash, look at it, and close it again, it will save a new revision even if you didn't add or remove anything. This may change in a future version, but I'm avoiding a script threading bug that can occur when a lot of items are added or removed at once.  
 
-Q. Where are the Stash states stored?
-A. In "My Games/Skyrim/SuperStash" (fixme: probably will be "My Games/Skyrim/SkyBox at release time") under "Stashes". Don't mess with the Config folder unless you know exactly what you're doing.
+**Q.** Where are the Stash states stored?  
+**A.** In "My Games/Skyrim/SuperStash" (fixme: probably will be "My Games/Skyrim/SkyBox at release time") under "Stashes". Don't mess with the Config folder unless you know exactly what you're doing.  
 
-Q. How many revisions are there?
-A. 10. That's a more or less arbitrary number and there's no reason there can't be more if people want them.
+**Q.** How many revisions are there?  
+**A.** 10. That's a more or less arbitrary number and there's no reason there can't be more if people want them.  
 
-Q. What's with the Items folder?
-A. That's a feature from Familiar Faces that I wound up using here too. It stores custom items in a human-readable format, which may be used in future versions of either SkyBox or FF. 
+**Q.** What's with the Items folder?  
+**A.** That's a feature from Familiar Faces that I wound up using here too. It stores custom items in a human-readable format, which may be used in future versions of either SkyBox or FF.  
 
-Q. Why is the Stash system so weird? Why doesn't it track my saves better or prevent duplication?
-A. Frankly it's a miracle that this works at all, particularly as fast as it is. I looked into some basic duplication prevention that worked by identifying the current session and marking the item's source, comparing the two, etc etc but it was complicated, wasn't 100% accurate and was still pretty easy to defeat. Keeping the Stashes dumb makes everything simpler.
+**Q.** Why is the Stash system so weird? Why doesn't it track my saves better or prevent duplication?  
+**A.** Frankly it's a miracle that this works at all, particularly as fast as it is. I looked into some basic duplication prevention that worked by identifying the current session and marking the item's source, comparing the two, etc etc but it was complicated, wasn't 100% accurate and was still pretty easy to defeat. Keeping the Stashes dumb makes everything simpler.  
 
-Q. Why is this not Familiar Faces?
-A. Because I burned out on FF a while back and needed to do something different for a while. In the process I wanted to completely redo the way FF handles saving and loading data, and SuperStash/SkyBox became my learning project for implementing that. Many features developed for SkyBox have already been backported to FF, and believe me, that's a good thing. 
+**Q.** Why is this not Familiar Faces?  
+**A.** Because I burned out on FF a while back and needed to do something different for a while. In the process I wanted to completely redo the way FF handles saving and loading data, and SuperStash/SkyBox became my learning project for implementing that. Many features developed for SkyBox have already been backported to FF, and believe me, that's a good thing.   
 
 Disclaimer
 ----------
