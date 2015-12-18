@@ -434,7 +434,7 @@ public:
 			jContainerEntry = GetItemJSON(thisForm);
 			if (!jContainerEntry.empty()) {
 				jContainerEntry["count"] = (Json::UInt)pEntry->count;
-				jContainerEntry["writtenBy"] = "0";
+				//jContainerEntry["writtenBy"] = "0";
 				m_json["containerEntries"].append(jContainerEntry);
 			}
 		}
@@ -455,7 +455,7 @@ public:
 		if (countTotal > 0) {
 			jInventoryEntryData = GetItemJSON(thisForm, entryData);
 			jInventoryEntryData["count"] = (Json::UInt)(countTotal);
-			jInventoryEntryData["writtenBy"] = "1";
+			//jInventoryEntryData["writtenBy"] = "1";
 		}
 
 		ExtendDataList* edl = entryData->extendDataList;
@@ -812,7 +812,7 @@ namespace papyrusSuperStash
 		ContainerJsonFiller containerJsonFiller = ContainerJsonFiller(containerJsonData);
 		pContainer->Visit(containerJsonFiller);
 
-		containerJsonData.WriteTofile("/Stashes/superquick.json");
+		//containerJsonData.WriteTofile("/Stashes/superquick.json");
 
 		return containerJsonData.GetJsonString().c_str();
 	}
