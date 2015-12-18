@@ -42,6 +42,7 @@ This works because the Stash is only tracking its own state. It doesn't care abo
 Skyrim's not designed with this in mind. If you want to have MMORPG or Diablo-style "account" storage, where only one character can use a given item at a time, you need to make sure you save appropriately. 
 
 To *transfer* an Ogre-Slaying Knife from **Alicekiin** to **Bobahkiin**
+
 1. Create a Stash (with any character).
 2. Load up Alicekiin and have her place the Ogre-Slaying Knife in the Stash.
 3. Save Alicekiin's game.
