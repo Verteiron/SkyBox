@@ -59,6 +59,9 @@ From the MCM, you can revert a Stash to a previous state. Just pick the Stash yo
 ###A note about custom items
 Customized items are created when the Stash is first loaded, and are recreated when the Stash state is updated by another session. This means the FormID of an object may change after being transferred between characters. In other words, if you put your favorite custom sword in the Stash, another character retrieves it, plays with it, puts it back, and the original character then retrieves it, they will be getting an exact duplicate of the original item, not the original itself. This generally shouldn't be a problem, but it's something to be aware of.
 
+##Modder resources and API
+There is an API for dealing with Stashes. Like so much else in this mod, it's practice for the new Familiar Faces, but I know it works because it's what my own scripts use, too. If you're interested, the [Stash API documentation is available.](http://verteiron.github.io/SuperStash/api/classv_s_s___a_p_i___stash.html) It reads like C++ docs (Doxygen is a C++ documentation generator) but it's all Papyrus code.
+
 ##FAQ
 
 **Q.** What happens if my other characters are already using the Stash container I just created?  
