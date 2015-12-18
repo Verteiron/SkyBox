@@ -1,5 +1,8 @@
 Please note this has not yet reached 1.0, which means there are known (and probably unknown) bugs that may do bad things to your game. Unless you're willing to help me test it and work with me to resolve any issues you encounter, don't even think about installing it right now.
 
+Download the current release here: https://github.com/Verteiron/SkyBox/releases
+You can view the Stash API here: [Stash API documentation](http://verteiron.github.io/SkyBox/api/classv_s_s___a_p_i___stash.html)
+
 #SkyBox
 Skyrim mod that allow items to be shared between different playthroughs. Any number of in-game chests can be turned into a *Stash*, which means its contents will be persistent no matter which character you are playing. This is still in development.
 
@@ -60,7 +63,7 @@ From the MCM, you can revert a Stash to a previous state. Just pick the Stash yo
 Customized items are created when the Stash is first loaded, and are recreated when the Stash state is updated by another session. This means the FormID of an object may change after being transferred between characters. In other words, if you put your favorite custom sword in the Stash, another character retrieves it, plays with it, puts it back, and the original character then retrieves it, they will be getting an exact duplicate of the original item, not the original itself. This generally shouldn't be a problem, but it's something to be aware of.
 
 ##Modder resources and API
-There is an API for dealing with Stashes. Like so much else in this mod, it's practice for the new Familiar Faces, but I know it works because it's what my own scripts use, too. If you're interested, the [Stash API documentation is available.](http://verteiron.github.io/SuperStash/api/classv_s_s___a_p_i___stash.html) It reads like C++ docs (Doxygen is a C++ documentation generator) but it's all Papyrus code.
+There is an API for dealing with Stashes. Like so much else in this mod, it's practice for the new Familiar Faces, but I know it works because it's what my own scripts use, too. If you're interested, the [Stash API documentation is available.](http://verteiron.github.io/SkyBox/api/classv_s_s___a_p_i___stash.html) It reads like C++ docs (Doxygen is a C++ documentation generator, I used regex trickery to get it to read Papyrus scripts) but it's all Papyrus code.
 
 ##FAQ
 
