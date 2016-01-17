@@ -291,15 +291,21 @@ bool IsWorthSaving(BaseExtraList * bel)
 //Removes (Fine), (Flawless), (Legendary) etc. Will also remove (foo).
 std::string StripWeaponHealth(std::string displayName)
 {
-	//std::string displayName(jBaseExtraData["displayName"].asString());
+	std::string result;
 	std::istringstream str(displayName);
 	std::vector<std::string> stringData;
 	std::string token;
 	while (std::getline(str, token, '(')) {
 		stringData.push_back(token);
 	}
-	return stringData[0].substr(0, stringData[0].length() - 1);
-		
+	result = stringData[0];
+	// trim trailing spaces
+	size_t endpos = result.find_last_not_of(" ");
+	if (std::string::npos != endpos)
+	{
+		result = result.substr(0, endpos + 1);
+	}
+	return result;
 }
 
 //Modified from PapyrusObjectReference.cpp!ExtraContainerFiller
