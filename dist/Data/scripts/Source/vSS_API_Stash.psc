@@ -712,8 +712,13 @@ Bool Function IsStashRef(ObjectReference akStashRef) Global
 *  @see 	IsStash()
 */
 }
-	If akStashRef && GetStashRefJMap(akStashRef)
-		Return True
+	If akStashRef 
+		String sStashID = GetUUIDForStashRef(akStashRef)
+		If sStashID
+			If JValue.IsMap(GetStashJMap(sStashID))
+				Return True
+			EndIf
+		EndIf
 	EndIf
 	Return False
 EndFunction
