@@ -648,11 +648,12 @@ Bool Function CreateStashRef(ObjectReference akStashRef, Int aiStashGroup = 0) G
 	Return False
 EndFunction
 
-Bool Function RemoveStash(String asUUID) Global
+Bool Function RemoveStash(String asUUID, Form akStashRef = None) Global
 {
 /**
 *  @brief 	Remove the Stash data for the specified Stash.
 *  @param 	asUUID The UUID of the Stash.
+*  @param 	akStashRef (Optional) The ObjectReference of the Stash.
 *  @return 	True for success, otherwise False.
 *  @note	This removes the Stash data from the persistent registry, 
 *			but does not touch the items in the Stash's Container.
@@ -662,10 +663,21 @@ Bool Function RemoveStash(String asUUID) Global
 		DebugTraceAPIStash("Error! " + asUUID + " is not a Stash!")
 		Return False
 	EndIf
-	ObjectReference kStashRef = GetStashRefForUUID(asUUID)
+	ObjectReference kStashRef = akStashRef as ObjectReference
+	If !kStashRef 
+		GetStashRefForUUID(asUUID)
+	EndIf
 	JMap.RemoveKey(GetRegObj("Stashes"),asUUID)
 	JFormMap.RemoveKey(GetRegObj("StashFormMap"),kStashRef)
+	JMap.RemoveKey(GetSessionObj("Stashes"),asUUID)
 	SaveReg()
+
+	;Now remove the shader effects from the ref if it's loaded
+	If kStashRef
+		vSS_StashManager StashManager = Quest.GetQuest("vSS_StashManagerQuest") as vSS_StashManager
+		EffectShader kContainerShader = StashManager.ContainerFXShader
+		kContainerShader.Stop(kStashRef)
+	EndIf
 
 	Return True
 EndFunction
@@ -685,11 +697,10 @@ Bool Function RemoveStashRef(ObjectReference akStashRef) Global
 		Return False
 	EndIf
 	String sStashID = GetUUIDForStashRef(akStashRef)
-	JMap.RemoveKey(GetRegObj("Stashes"),sStashID)
-	JFormMap.RemoveKey(GetRegObj("StashFormMap"),akStashRef)
+	Bool bResult = RemoveStash(sStashID,akStashRef)
 	SaveReg()
 
-	Return True
+	Return bResult
 EndFunction
 
 Bool Function IsStashRef(ObjectReference akStashRef) Global
