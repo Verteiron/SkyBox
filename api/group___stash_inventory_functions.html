@@ -88,7 +88,7 @@ Functions</h2></td></tr>
       </table>
   </td>
   <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel">inline</span></span>  </td>
+<span class="mlabels"><span class="mlabel">inline</span><span class="mlabel">static</span></span>  </td>
   </tr>
 </table>
 </div><div class="memdoc">
@@ -130,7 +130,7 @@ Functions</h2></td></tr>
       </table>
   </td>
   <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel">inline</span></span>  </td>
+<span class="mlabels"><span class="mlabel">inline</span><span class="mlabel">static</span></span>  </td>
   </tr>
 </table>
 </div><div class="memdoc">
@@ -163,7 +163,7 @@ Functions</h2></td></tr>
       </table>
   </td>
   <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel">inline</span></span>  </td>
+<span class="mlabels"><span class="mlabel">inline</span><span class="mlabel">static</span></span>  </td>
   </tr>
 </table>
 </div><div class="memdoc">
@@ -176,6 +176,7 @@ Functions</h2></td></tr>
 <dl class="section return"><dt>Returns</dt><dd>The number Stashes loaded for the Cell.</dd></dl>
 <dl class="section warning"><dt>Warning</dt><dd>Do not attempt to use this for a Cell that is not currently loaded! ObjectReferences for unloaded Cells return None, so they will NOT get populated properly!</dd></dl>
 <dl class="section note"><dt>Note</dt><dd>Depending on the number of Stashes and how many items are in them, this may takes some time to return. Under normal circumstances it should still be less than a second, though.</dd></dl>
+<p>Also cleans up any StashRefs which no longer have valid Stash entries, and will strip the Stash effect from non-Stash containers.</p>
 
 </div>
 </div>
@@ -196,7 +197,7 @@ Functions</h2></td></tr>
       </table>
   </td>
   <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel">inline</span></span>  </td>
+<span class="mlabels"><span class="mlabel">inline</span><span class="mlabel">static</span></span>  </td>
   </tr>
 </table>
 </div><div class="memdoc">
@@ -230,7 +231,7 @@ Functions</h2></td></tr>
       </table>
   </td>
   <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel">inline</span></span>  </td>
+<span class="mlabels"><span class="mlabel">inline</span><span class="mlabel">static</span></span>  </td>
   </tr>
 </table>
 </div><div class="memdoc">
