@@ -665,8 +665,9 @@ Bool Function RemoveStash(String asUUID, Form akStashRef = None) Global
 	EndIf
 	ObjectReference kStashRef = akStashRef as ObjectReference
 	If !kStashRef 
-		GetStashRefForUUID(asUUID)
+		kStashRef = GetStashRefForUUID(asUUID)
 	EndIf
+	DebugTraceAPIStash("Removing Stash " + kStashRef + " (" + asUUID + ")!")
 	JMap.RemoveKey(GetRegObj("Stashes"),asUUID)
 	JFormMap.RemoveKey(GetRegObj("StashFormMap"),kStashRef)
 	JMap.RemoveKey(GetSessionObj("Stashes"),asUUID)
@@ -932,8 +933,13 @@ Int Function LoadStashesForCell(Cell akCell) Global
 *  @note 	Depending on the number of Stashes and how many items are in them, this 
 * 			may takes some time to return. Under normal circumstances it should still be
 * 			less than a second, though.
+*			
+*			Also cleans up any StashRefs which no longer have valid Stash entries, and 
+*			will strip the Stash effect from non-Stash containers.
 */
 }
+	vSS_StashManager StashManager = Quest.GetQuest("vSS_StashManagerQuest") as vSS_StashManager
+	EffectShader kContainerShader = StashManager.ContainerFXShader
 	Int iContainerCount = akCell.GetNumRefs(formTypeFilter = 28) ;kContainer
 	Int i = 0
 	While i < iContainerCount
@@ -947,6 +953,8 @@ Int Function LoadStashesForCell(Cell akCell) Global
 			
 			;Int iCount = SuperStash.FillContainerFromJSON(kContainer,sFilePath)
 			DebugTraceAPIStash("Imported " + iCount + " items for " + kContainer + ".")
+		Else
+			kContainerShader.Stop(kContainer)
 		EndIf
 		i += 1
 	EndWhile
