@@ -20,7 +20,7 @@ Int Property ModVersionMajor Auto Hidden
 Int Property ModVersionMinor Auto Hidden
 Int Property ModVersionPatch Auto Hidden
 
-String Property ModName = "SuperStash" Auto Hidden
+String Property ModName = "SkyBox" Auto Hidden
 
 Message Property vSS_ModLoadedMSG Auto
 Message Property vSS_ModUpdatedMSG Auto
@@ -148,7 +148,7 @@ Function DoUpkeep(Bool DelayedStart = True)
 EndFunction
 
 Function DoInit()
-	Debug.Notification("SuperStash will be ready in just a few seconds...")
+	Debug.Notification("SkyBox will be ready in just a few seconds...")
 
 	InitReg()
 
@@ -232,7 +232,7 @@ Function DoShutdown(Bool abClearData = False)
 	If abClearData
 		JDB.SolveObjSetter(".vSS",0)
 		DebugTrace("Data cleared, ready for removal!")
-		Debug.Notification("SuperStash\nData has been cleared. You should now save and exit, then uninstall the mod before re-launching the game.")
+		Debug.Notification("SkyBox\nData has been cleared. You should now save and exit, then uninstall the mod before re-launching the game.")
 	EndIf
 	vSS_ModShutdownMSG.Show()
 	_Running = False
@@ -247,13 +247,13 @@ Bool Function CheckDependencies()
 	DebugTrace("NIOverride is version " + SKSE.GetPluginVersion("nioverride"))
 	;Debug.MessageBox("SKSE version is " + fSKSE)
 	If fSKSE < 1.0702
-		Debug.MessageBox("SuperStash\nThis mod requires SKSE 1.7.2 or higher, but it seems to be missing or out of date.\nThe mod will now shut down.")
+		Debug.MessageBox("SkyBox\nThis mod requires SKSE 1.7.2 or higher, but it seems to be missing or out of date.\nThe mod will now shut down.")
 		Return False
 	Else
 		;Proceed
 	EndIf
 	If JContainers.APIVersion() < 3
-		Debug.MessageBox("SuperStash\nThis mod requires JContainers with API 3 (3.1.x), but it seems to be missing or out of date.\nThe mod will now shut down.")
+		Debug.MessageBox("SkyBox\nThis mod requires JContainers with API 3 (3.2.x), but it seems to be missing or out of date.\nThe mod will now shut down.")
 		Return False
 	Else
 		;Proceed

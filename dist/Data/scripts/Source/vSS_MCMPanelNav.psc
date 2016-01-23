@@ -1,5 +1,5 @@
 Scriptname vSS_MCMPanelNav extends SKI_ConfigBase
-{MCM panel manager for SuperStash.}
+{MCM panel manager for SkyBox.}
 
 String[] 	Property 	PanelStates		Auto Hidden
 String[] 	Property 	PanelNames		Auto Hidden

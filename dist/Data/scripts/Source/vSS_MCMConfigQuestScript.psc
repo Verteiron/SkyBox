@@ -1,5 +1,5 @@
 Scriptname vSS_MCMConfigQuestScript extends vSS_MCMPanelNav
-{MCM config script for SuperStash.}
+{MCM config script for SkyBox.}
 
 ; === [ vSS_MCMConfigQuestScript.psc ] ===================================---
 ; MCM config script. 
