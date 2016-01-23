@@ -994,7 +994,7 @@ Int Function ImportStashRefItems(ObjectReference akStashRef, Bool abForce = Fals
 	Int iDataSerial = JValue.SolveInt(jStashData,".DataSerial")
 
 	If GetStashSessionInt(sStashID,"DataSerial") == 0 && akStashRef.GetNthForm(0)
-		Debug.Notification("SuperStash: Stash '" + GetStashStr(sStashID,"StashName") + "' was not empty, contents have been merged!")
+		Debug.Notification("SkyBox: Stash '" + GetStashStr(sStashID,"StashName") + "' was not empty, contents have been merged!")
 		akStashRef.RemoveAllItems(kTempStash,True,True)
 		bIsEmpty = False 
 	EndIf
@@ -1067,14 +1067,14 @@ Int Function UpdateStashData(String asUUID) Global
 */
 }
 	If !IsStash(asUUID)
-		DebugTraceAPIStash("UpdateStashData: Error! " + asUUID + " is not a valid Stash!")
+		DebugTraceAPIStash("UpdateStashData: Error! " + asUUID + " is not a valid Stash!",2)
 		Return -1
 	EndIf
 
 	ObjectReference kStashRef = GetStashRefForUUID(asUUID)
 
 	If !kStashRef
-		DebugTraceAPIStash("UpdateStashData: Error! " + kStashRef + " is not a valid Stash ObjectReference!")
+		DebugTraceAPIStash("UpdateStashData: Error! " + kStashRef + " is not a valid Stash ObjectReference!",2)
 		Return -2
 	EndIf
 
