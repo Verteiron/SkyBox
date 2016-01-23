@@ -94,7 +94,7 @@ Function DoUpkeep(Bool DelayedStart = True)
 	DebugTrace("Metaquest event: DoUpkeep(" + DelayedStart + ")")
 	;FIXME: CHANGE THIS WHEN UPDATING!
 	ModVersionMajor = 0
-	ModVersionMinor = 8
+	ModVersionMinor = 9
 	ModVersionPatch = 0
 	If !CheckDependencies()
 		AbortStartup()
