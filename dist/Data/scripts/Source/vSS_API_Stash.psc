@@ -1045,7 +1045,7 @@ Int Function ScanContainer(ObjectReference akStashRef) Global
 	vSS_StashManager StashManager = Quest.GetQuest("vSS_StashManagerQuest") as vSS_StashManager
 
 	Int jContainerState = JValue.objectFromPrototype(SuperStash.GetContainerJSON(akStashRef))
-	JValue.WriteToFile(jContainerState,SuperStash.userDirectory() + "Stashes/quick.json")
+	; JValue.WriteToFile(jContainerState,SuperStash.userDirectory() + "Stashes/quick.json")
 	
 	DebugTraceAPIStash("=== Finished scan of " + akStashRef + " ===--")
 	Return jContainerState
@@ -1176,9 +1176,9 @@ EndFunction
 
 String Function GetStashFileNameString(String asUUID) Global
 	If GetStashStr(asUUID,"Source")
-		Return GetStashStr(asUUID,"Source") + "_" + GetStashStr(asUUID,"FormIDString") + "_" + asUUID
+		Return GetStashStr(asUUID,"Source") + "_" + GetStashStr(asUUID,"FormIDString") ;+ "_" + asUUID
 	Else
-		Return GetStashStr(asUUID,"FormIDString") + "_" + asUUID
+		Return GetStashStr(asUUID,"FormIDString") ;+ "_" + asUUID
 	EndIf
 EndFunction
 
