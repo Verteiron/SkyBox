@@ -59,7 +59,7 @@ EndFunction
 Int Function GetStashJMap(String asUUID) Global
 {
 /**
-*  @brief 	Get the JMap for the specified Stash.
+*  @brief 	Get the JMap for the specified Stash. If it's not in the registry, load it from its JSON file.
 *  @param 	asUUID The UUID of the Stash.
 *  @return	The JMap object or 0 if not found.
 */
@@ -67,6 +67,19 @@ Int Function GetStashJMap(String asUUID) Global
 	Int jStashJMap = GetRegObj("Stashes." + asUUID)
 	If JValue.isMap(jStashJMap)
 		Return jStashJMap
+	Else ;Attempt to load from JSON
+		String sStashFileName  = GetStashFileNameString(asUUID)
+		String sFilePath = SuperStash.userDirectory() + "Stashes\\" ;"; <-- fix for highlighting in SublimePapyrus
+		sFilePath += sStashFileName + ".json"
+		jStashJMap = JValue.ReadFromFile(sFilePath)
+		If JValue.isMap(jStashJMap)
+			If JMap.GetStr(jStashJMap,"UUID") == asUUID
+				SetRegObj("Stashes." + asUUID,jStashJMap)
+				Return jStashJMap
+			Else ; UUID mismatch - probably should give the user the option to load anyway, but for now just fail
+				DebugTraceAPIStash("ERROR: Stash in JSON (" + JMap.GetStr(jStashJMap,"UUID") + ") does not match registry entry (" + asUUID + ")!")
+			EndIf
+		EndIf
 	EndIf
 	Return 0
 EndFunction
