@@ -1016,7 +1016,9 @@ Int Function ImportStashRefItems(ObjectReference akStashRef, Bool abForce = Fals
 
 	EffectShader    kContainerShader 	= StashManager.ContainerFXShader
 	kContainerShader.Stop(akStashRef)
-	kContainerShader.Play(akStashRef)
+	If GetRegInt("Config.UseFXShader")
+		kContainerShader.Play(akStashRef)
+	EndIf
 
 	;akStashRef.RemoveAllItems()
 	DebugTraceAPIStash("Saved DataSerial is " + iDataSerial + ", Session DataSerial is " + GetStashSessionInt(sStashID,"DataSerial"))
@@ -1111,7 +1113,9 @@ Int Function UpdateStashData(String asUUID) Global
 
 	EffectShader    kContainerShader 	= StashManager.ContainerFXShader
 	kContainerShader.Stop(kStashRef)
-	kContainerShader.Play(kStashRef)
+	If GetRegInt("Config.UseFXShader")
+		kContainerShader.Play(kStashRef)
+	EndIf
 
 	Int jStashState = ScanContainer(kStashRef)
 

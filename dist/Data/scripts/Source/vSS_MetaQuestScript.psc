@@ -276,7 +276,9 @@ EndFunction
 
 Function UpdateConfig()
 	DebugTrace("Updating configuration...")
-
+	If !HasRegKey("Config.UseFXShader")
+		SetRegInt("Config.UseFXShader",1)
+	EndIf
 	DebugTrace("Updated configuration values, some scripts may update in the background!")
 EndFunction
 

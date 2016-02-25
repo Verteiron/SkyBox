@@ -14,6 +14,9 @@ Import vSS_Session
 
 ; === Enums ===--
 
+String[] TEXT_GLOBALS_DELETE_BACKUPS
+String[] TEXT_GLOBALS_USE_FXSHADER
+
 ; === Properties ===--
 
 vSS_MetaQuestScript 	Property MetaQuest 						Auto
@@ -43,10 +46,10 @@ EndEvent
 
 Event OnConfigInit()
 	ModName = "$SkyBox"
-	Pages = New String[8]
+	Pages = New String[2]
 	Pages[0] = "$Manage Stashes"
 	Pages[1] = "$Global Options"
-	Pages[7] = "$Debugging"
+	; Pages[7] = "$Debugging"
 
 	CreatePanel("PANEL_STASH_PICKER","$Stash Picker")
 	CreatePanel("PANEL_STASH_OPTIONS","$Stash Options","PANEL_STASH_PICKER")
@@ -76,6 +79,14 @@ Event OnPageReset(string a_page)
 			PushPanel("PANEL_STASH_HISTORY")
 		EndIf
 		DisplayPanels()
+	ElseIf a_page == Pages[1]
+		SetCursorFillMode(TOP_TO_BOTTOM)
+		AddHeaderOption("$Visuals")
+		AddTextOptionST("OPTION_TEXT_GLOBALS_USE_FXSHADER","$Show visuals",TEXT_GLOBALS_USE_FXSHADER[GetRegInt("Config.UseFXShader")])
+		AddEmptyOption()
+		AddHeaderOption("$UI options")
+		AddTextOptionST("OPTION_TEXT_GLOBALS_DELETE_BACKUPS","$Delete backups when removing stash",TEXT_GLOBALS_DELETE_BACKUPS[GetRegInt("Config.DeleteBackups")])
+
 	ElseIf a_page == Pages[7]
 		; AddTextOptionST("OPTION_TEXT_PLAYER_SAVE", "Save player", "right now!")
 	Else
@@ -227,7 +238,15 @@ State OPTION_TEXT_DESTROY_STASH
 	Event OnSelectST()
 		;Confirm this 
 		If ShowMessage("$Destroy Stash", True)
-			Bool bDeleteBackups = ShowMessage("$Keep Backups", True, "$Yes", "$No")
+			Bool bDeleteBackups
+			Int iConfigDeleteBackups = GetRegInt("Config.DeleteBackups")
+			If iConfigDeleteBackups == 1
+				bDeleteBackups = True
+			ElseIf iConfigDeleteBackups == 2
+				bDeleteBackups = False
+			Else 
+				bDeleteBackups = ShowMessage("$Keep Backups", True, "$Yes", "$No")
+			EndIf
 			vSS_API_Stash.RemoveStash(CurrentStashUUID,None,bDeleteBackups)
 			CurrentStashUUID = ""
 			CurrentStashName = ""
@@ -236,6 +255,20 @@ State OPTION_TEXT_DESTROY_STASH
 		EndIf
 	EndEvent
 
+EndState
+
+State OPTION_TEXT_GLOBALS_USE_FXSHADER
+	Event OnSelectST()
+		SetRegInt("Config.UseFXShader",IncStringArray(TEXT_GLOBALS_USE_FXSHADER,GetRegInt("Config.UseFXShader")))
+		SetTextOptionValueST(TEXT_GLOBALS_USE_FXSHADER[GetRegInt("Config.UseFXShader")], false, "OPTION_TEXT_GLOBALS_USE_FXSHADER")
+	EndEvent
+EndState
+
+State OPTION_TEXT_GLOBALS_DELETE_BACKUPS
+	Event OnSelectST()
+		SetRegInt("Config.DeleteBackups",IncStringArray(TEXT_GLOBALS_DELETE_BACKUPS,GetRegInt("Config.DeleteBackups")))
+		SetTextOptionValueST(TEXT_GLOBALS_DELETE_BACKUPS[GetRegInt("Config.DeleteBackups")], false, "OPTION_TEXT_GLOBALS_DELETE_BACKUPS")
+	EndEvent
 EndState
 
 Event OnOptionSelect(int a_option)
@@ -254,6 +287,14 @@ Event OnOptionSelect(int a_option)
 	EndIf
 EndEvent
 
+Int Function IncStringArray(String[] asOptionArray, Int aiValue)
+	aiValue += 1
+	If aiValue >= asOptionArray.Length
+		aiValue = 0
+	EndIf
+	Return aiValue
+EndFunction
+
 Function DoInit()
 	FillEnums()
 	UpdateMCMNames()
@@ -267,7 +308,14 @@ Function UpdateMCMNames()
 EndFunction
 
 Function FillEnums()
+	TEXT_GLOBALS_DELETE_BACKUPS = New String[3]
+	TEXT_GLOBALS_DELETE_BACKUPS[0] = "$Ask"
+	TEXT_GLOBALS_DELETE_BACKUPS[1] = "$Always"
+	TEXT_GLOBALS_DELETE_BACKUPS[2] = "$Never"
 
+	TEXT_GLOBALS_USE_FXSHADER = New String[2]
+	TEXT_GLOBALS_USE_FXSHADER[0] = "$Never"
+	TEXT_GLOBALS_USE_FXSHADER[1] = "$Brief"
 EndFunction
 
 ; === Utility functions ===--
