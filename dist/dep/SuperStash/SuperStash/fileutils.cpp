@@ -24,6 +24,43 @@ bool isReadable(const std::string& name) {
 	}
 }
 
+bool isInSSDir(LPCSTR lpFileName)
+{
+	char ssPath[MAX_PATH];
+	sprintf_s(ssPath, "%s", GetSSDirectory().c_str());
+
+	char testPath[MAX_PATH];
+	sprintf_s(testPath, "%s", lpFileName);
+
+	char ssDrive[_MAX_DRIVE];
+	char ssDir[_MAX_DIR];
+	char drive[_MAX_DRIVE];
+	char dir[_MAX_DIR];
+	char fname[_MAX_FNAME];
+	char ext[_MAX_EXT];
+	errno_t err;
+
+	err = _splitpath_s(ssPath, ssDrive, _MAX_DRIVE, ssDir, _MAX_DIR, fname, _MAX_FNAME, ext, _MAX_EXT);
+	if (err != 0)
+	{
+		_ERROR("%s - error splitting path %s (Error %d)", __FUNCTION__, testPath, err);
+		return false;
+	}
+
+	err = _splitpath_s(testPath, drive, _MAX_DRIVE, dir, _MAX_DIR, fname, _MAX_FNAME, ext, _MAX_EXT);
+	if (err != 0)
+	{
+		_ERROR("%s - error splitting path %s (Error %d)", __FUNCTION__, testPath, err);
+		return false;
+	}
+
+	if (_strcmpi(ssDir, dir))
+	{
+		return true;
+	}
+
+	return false;
+}
 
 UInt32 SSCopyFile(LPCSTR lpExistingFileName, LPCSTR lpNewFileName)
 {
@@ -79,7 +116,7 @@ UInt32 SSDeleteFile(LPCSTR lpExistingFileName)
 	if (!DeleteFile(lpExistingFileName)) {
 		UInt32 lastError = GetLastError();
 		ret = lastError;
-		_ERROR("%s - error moving file %s (Error %d)", __FUNCTION__, lpExistingFileName, lastError);
+		_ERROR("%s - error deleting file %s (Error %d)", __FUNCTION__, lpExistingFileName, lastError);
 	}
 	return ret;
 }

@@ -2,6 +2,7 @@
 
 std::string GetSSDirectory();
 bool isReadable(const std::string& name);
+bool isInSSDir(LPCSTR lpFileName);
 UInt32 SSCopyFile(LPCSTR lpExistingFileName, LPCSTR lpNewFileName);
 UInt32 SSMoveFile(LPCSTR lpExistingFileName, LPCSTR lpNewFileName);
 UInt32 SSDeleteFile(LPCSTR lpExistingFileName);

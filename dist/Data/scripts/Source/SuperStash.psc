@@ -20,6 +20,9 @@ Int Function RotateFile(String asFileName, Int aiMaxCount = 9) native global
 {Does a UNIX-style file rotation on the file specified by asFileName. 
  Example.json -> Example.1.json -> Example.2.json -> ... Example.aiMaxCount.json}
 
+Function DeleteStashFile(String asFileName, Bool abRemoveBackups = False) native global
+{Delete the JSON file for a Stash. Optionally delete all numbered backup files, too.}
+
 String Function UUID() native global
 {Returns a random UUID.}
 

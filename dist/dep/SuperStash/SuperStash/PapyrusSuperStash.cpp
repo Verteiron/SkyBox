@@ -1,3 +1,4 @@
+#include <direct.h>
 #include <functional>
 #include <random>
 #include <algorithm>
@@ -740,6 +741,32 @@ namespace papyrusSuperStash
 		return ssRotateFile(filename.data, maxCount);
 	}
 
+	void DeleteStashFile(StaticFunctionTag*, BSFixedString filename, bool deleteBackups = false)
+	{
+		char filePath[MAX_PATH];
+		sprintf_s(filePath, "%s/Stashes/%s.json", GetSSDirectory().c_str(), filename.data);
+		if (!isReadable(filePath))
+		{
+			_MESSAGE("%s - File not found: %s", __FUNCTION__, filePath);
+			return;
+		}
+		if (!isInSSDir(filePath))
+		{
+			_MESSAGE("%s - user tried to delete a file outside the SS dir... naughty! File was %s", __FUNCTION__, filename.data);
+			return;
+		}
+		_MESSAGE("%s - Deleting file %s", __FUNCTION__, filePath);
+		SSDeleteFile(filePath);
+		if (deleteBackups)
+		{
+			for (int i = 0; i < 10; i++)
+			{
+				sprintf_s(filePath, "%s/Stashes/%s.%d.json", GetSSDirectory().c_str(), filename.data, i);
+				SSDeleteFile(filePath);
+			}
+		}
+	}
+
 	BSFixedString UUID(StaticFunctionTag*)
 	{
 		int bytes[16];
@@ -851,6 +878,9 @@ void papyrusSuperStash::RegisterFuncs(VMClassRegistry* registry)
 
 	registry->RegisterFunction(
 		new NativeFunction2<StaticFunctionTag, SInt32, BSFixedString, SInt32>("RotateFile", "SuperStash", papyrusSuperStash::RotateFile, registry));
+
+	registry->RegisterFunction(
+		new NativeFunction2<StaticFunctionTag, void, BSFixedString, bool>("DeleteStashFile", "SuperStash", papyrusSuperStash::DeleteStashFile, registry));
 
 	registry->RegisterFunction(
 		new NativeFunction0<StaticFunctionTag, BSFixedString>("UUID", "SuperStash", papyrusSuperStash::UUID, registry));

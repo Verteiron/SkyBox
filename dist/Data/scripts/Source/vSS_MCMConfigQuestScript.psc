@@ -227,7 +227,8 @@ State OPTION_TEXT_DESTROY_STASH
 	Event OnSelectST()
 		;Confirm this 
 		If ShowMessage("$Destroy Stash", True)
-			vSS_API_Stash.RemoveStash(CurrentStashUUID)
+			Bool bDeleteBackups = ShowMessage("$Keep Backups", True, "$Yes", "$No")
+			vSS_API_Stash.RemoveStash(CurrentStashUUID,None,bDeleteBackups)
 			CurrentStashUUID = ""
 			CurrentStashName = ""
 			UpdateMCMNames()

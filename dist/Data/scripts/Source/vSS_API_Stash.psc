@@ -661,7 +661,7 @@ Bool Function CreateStashRef(ObjectReference akStashRef, Int aiStashGroup = 0) G
 	Return False
 EndFunction
 
-Bool Function RemoveStash(String asUUID, Form akStashRef = None) Global
+Bool Function RemoveStash(String asUUID, Form akStashRef = None, Bool abDeleteBackups = False) Global
 {
 /**
 *  @brief 	Remove the Stash data for the specified Stash.
@@ -681,10 +681,12 @@ Bool Function RemoveStash(String asUUID, Form akStashRef = None) Global
 		kStashRef = GetStashRefForUUID(asUUID)
 	EndIf
 	DebugTraceAPIStash("Removing Stash " + kStashRef + " (" + asUUID + ")!")
+	SuperStash.DeleteStashFile(GetStashFileNameString(asUUID),abDeleteBackups)
 	JMap.RemoveKey(GetRegObj("Stashes"),asUUID)
 	JFormMap.RemoveKey(GetRegObj("StashFormMap"),kStashRef)
 	JMap.RemoveKey(GetSessionObj("Stashes"),asUUID)
 	SaveReg()
+
 
 	;Now remove the shader effects from the ref if it's loaded
 	If kStashRef
