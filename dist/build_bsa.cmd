@@ -16,9 +16,11 @@ del %DATA%\*.bsa
 del %DATA%\*.bsl
 attrib /s +h %DATA%\skse\*
 attrib +h %DATA%\skse
+attrib +h %DATA%\*.esp
 for /f "tokens=%I%* delims=\" %%A in ('dir %DATA%\* /a-D-H /b /s') DO echo %%B >> filelist.txt
 attrib -h %DATA%\skse
 attrib /s -h %DATA%\skse\*
+attrib -h %DATA%\*.esp
 echo Building archive...
 Archive.exe bsascript.txt
 endlocal
