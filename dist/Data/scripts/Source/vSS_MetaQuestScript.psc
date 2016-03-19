@@ -93,9 +93,9 @@ EndEvent
 Function DoUpkeep(Bool DelayedStart = True)
 	DebugTrace("Metaquest event: DoUpkeep(" + DelayedStart + ")")
 	;FIXME: CHANGE THIS WHEN UPDATING!
-	ModVersionMajor = 0
-	ModVersionMinor = 9
-	ModVersionPatch = 3
+	ModVersionMajor = 1
+	ModVersionMinor = 0
+	ModVersionPatch = 0
 	If !CheckDependencies()
 		AbortStartup()
 		Return
@@ -280,10 +280,6 @@ Function UpdateConfig()
 		SetRegInt("Config.UseFXShader",1)
 	EndIf
 	DebugTrace("Updated configuration values, some scripts may update in the background!")
-EndFunction
-
-Int Function GetVersionInt(Int iMajor, Int iMinor, Int iPatch)
-	Return Math.LeftShift(iMajor,16) + Math.LeftShift(iMinor,8) + iPatch
 EndFunction
 
 String Function GetVersionString(Int iVersion)
