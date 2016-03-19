@@ -212,9 +212,20 @@ State OPTION_MENU_STASH_PICKER
 		ForcePageReset()
 	EndEvent
 
+	Event OnHighlightST()
+		SetInfoText("$INFO-StashPicker")
+	EndEvent
+
 EndState
 
 State OPTION_INPUT_STASH_NAME
+
+	Event OnHighlightST()
+		SetInfoText("$INFO-StashName")
+	EndEvent
+
+	Event OnSelectST()
+	EndEvent
 
 	Event OnInputOpenST()
 		SetInputDialogStartText(GetRegStr("Stashes." + CurrentStashUUID + ".StashName"))
@@ -255,6 +266,10 @@ State OPTION_TEXT_DESTROY_STASH
 		EndIf
 	EndEvent
 
+	Event OnHighlightST()
+		SetInfoText("$INFO-DestroyStash")
+	EndEvent
+
 EndState
 
 State OPTION_TEXT_GLOBALS_USE_FXSHADER
@@ -262,12 +277,30 @@ State OPTION_TEXT_GLOBALS_USE_FXSHADER
 		SetRegInt("Config.UseFXShader",IncStringArray(TEXT_GLOBALS_USE_FXSHADER,GetRegInt("Config.UseFXShader")))
 		SetTextOptionValueST(TEXT_GLOBALS_USE_FXSHADER[GetRegInt("Config.UseFXShader")], false, "OPTION_TEXT_GLOBALS_USE_FXSHADER")
 	EndEvent
+
+	Event OnDefaultST()
+		SetRegInt("Config.UseFXShader",1)
+		SetTextOptionValueST(TEXT_GLOBALS_USE_FXSHADER[1], false, "OPTION_TEXT_GLOBALS_USE_FXSHADER")
+	EndEvent
+
+	Event OnHighlightST()
+		SetInfoText("$INFO-UseFXShader")
+	EndEvent
 EndState
 
 State OPTION_TEXT_GLOBALS_DELETE_BACKUPS
 	Event OnSelectST()
 		SetRegInt("Config.DeleteBackups",IncStringArray(TEXT_GLOBALS_DELETE_BACKUPS,GetRegInt("Config.DeleteBackups")))
 		SetTextOptionValueST(TEXT_GLOBALS_DELETE_BACKUPS[GetRegInt("Config.DeleteBackups")], false, "OPTION_TEXT_GLOBALS_DELETE_BACKUPS")
+	EndEvent
+
+	Event OnDefaultST()
+		SetRegInt("Config.DeleteBackups",0)
+		SetTextOptionValueST(TEXT_GLOBALS_DELETE_BACKUPS[0], false, "OPTION_TEXT_GLOBALS_DELETE_BACKUPS")
+	EndEvent
+
+	Event OnHighlightST()
+		SetInfoText("$INFO-DeleteBackups")
 	EndEvent
 EndState
 
@@ -284,6 +317,13 @@ Event OnOptionSelect(int a_option)
 			vSS_API_Stash.RevertToBackup(CurrentStashUUID,iRevision)
 			ForcePageReset()
 		EndIf
+	EndIf
+EndEvent
+
+Event OnOptionHighlight(int a_option)
+	If _iHistoryOptions.Find(a_option) > -1
+		;History option was highlighted!
+		SetInfoText("$INFO-HistoryOption")
 	EndIf
 EndEvent
 
