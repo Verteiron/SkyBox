@@ -1,6 +1,4 @@
-Please note this has not yet reached 1.0, which means there are known (and probably unknown) bugs that may do bad things to your game. Unless you're willing to help me test it and work with me to resolve any issues you encounter, don't even think about installing it right now.
-
-#SkyBox 0.8.0-ish
+#SkyBox
 Skyrim mod that allow items to be shared between different playthroughs. Any number of in-game chests can be turned into a *Stash*, which means its contents will be persistent no matter which character you are playing. This is still in development.
 
 ##How to use it
@@ -15,7 +13,7 @@ Be cautious when storing Quest-related items. If you store, say, Auriel's Bow, t
 Once a container has been turned into a Stash, it can be managed from the SkyBox MCM panel. From the MCM you can get info about all the Stashes you can created, as well as do things like roll them back to earlier "versions" of their contents. In the future you will be able to do cute tricks like link containers together within a single save, so you can, say, make all your player homes in all your saved games have a box with a single shared storage pool.
 
 ##Removing a Stash
-You can remove the Stash spell from a container using the MCM. This will make it behave like a standard container. Any items already in it will remain available in all games that have been saved since the Stash was created. 
+You can remove the Stash spell from a container using the MCM. This will make it behave like a standard container. Any items already in it will remain available, but no new items will be transferred between games.
 
 ##How Stashes work (AKA how to avoid losing your items)
 Stashes save their contents any time you close their inventory screen. These saves are completely independent from your normal saved games, which can lead to unexpected behavior if you don't understand how it works.
@@ -64,29 +62,35 @@ There is an API for dealing with Stashes. Like so much else in this mod, it's pr
 
 ##FAQ
 
+**Q.** Can I "hide" items in dungeon chests for my other characters to find?
+**A.** Yes! Any items you put in a dungeon chest will be added to its default items when your other characters enters the cell it's in. So if Alicekiin puts 20 gold and an ogre-slaying knife in a dungeon chest that normally has 5 gold and a random fruit in it, Bobahkiin will find the chest contains 25 gold, a random fruit, and an ogre-slaying knife. 
+
 **Q.** What happens if my other characters are already using the Stash container I just created?  
-**A.** The items will be merged with existing ones, but for safety it's best if you pick containers that are empty. 
+**A.** The items will be merged with existing ones. Note that if you repeatedly load a game that merges items, you will start accumulating duplicates. For safety it's best if you pick containers that are empty.
 
 **Q.** What if the Stash's container isn't available in one of my saves?   
-**A.** It won't cause any problems, but you won't be able to access it with that character until it *is* available.  
+**A.** It won't cause any problems, but you won't be able to access it with that character until it *is* available. For example, if you turn Breezehome's alchemy chest into a Stash, your other characters won't be able to get to it unless they have the alchemy room, too.
 
 **Q.** Can I make Stashes out of containers from other mods?  
 **A.** Yes, but don't forget and uninstall the mod while the Stash is active, as you'll probably lose any items you have in it.  
 
 **Q.** Is Skybox compatible with mods that link multiple containers together?  
-**A.** Almost certainly not. If you want to try it, be my guest, but I don't think it will end well. Most of these types of mods work by using a hidden container in some other location. If you made *that* container a Stash, it might sort-of work, but I haven't tried this and you probably shouldn't, either.  
+**A.** Almost certainly not. If you want to try it, be my guest, but I don't think it will end well. Most of these types of mods work by using a hidden container in some other location. If you made *that* container a Stash, it might sort-of work, but I haven't tried this and you probably shouldn't, either. I do plan to add same-game Stash synchronization (aka Stash Groups) as a feature at some point.
 
 **Q.** I LOST AN ITEM! WHAT DO I DO?  
-**A.** First, calm down. If you still have a savegame with the item, you're fine, just load it up and put the item back in the Stash without saving. If you don't (how did that even happen?), go to the MCM, find the Stash you were using, and revert it to a version that you know still has the missing item. If none of the revisions have it, then... you may be out of luck. The item itself should be stored as a json file, but you'll have to re-add it to the Stash file by hand, as there's no in-game method to do this yet.  
+**A.** First, calm down. If you still have a savegame with the item, you're fine, just load it up and put the item back in the Stash. If you don't (how did that even happen?), go to the MCM, find the Stash you were using, and revert it to a version that you know still has the missing item. If none of the revisions have it, then... you may be out of luck. The item itself should be stored as a json file, but you'll have to re-add it to the Stash file by hand, as there's no in-game method to do this yet.  
 
 **Q.** When do Stashes get saved?  
 **A.** Any time the container's inventory menu is closed. In other words, if you open a Stash, look at it, and close it again, it will save a new revision even if you didn't add or remove anything. This may change in a future version, but I'm avoiding a script threading bug that can occur when a lot of items are added or removed at once.  
 
+**Q.** When do Stash contents get loaded?
+**A.** Whenever the Cell containing the Stash is loaded. This means that Stash items will not disappear due to cell resets, so it's safe to use them even in dungeons, bandit camps, forts, etc.
+
 **Q.** Where are the Stash states stored?  
-**A.** In "My Games/Skyrim/SuperStash" (fixme: probably will be "My Games/Skyrim/SkyBox at release time") under "Stashes". Don't mess with the Config folder unless you know exactly what you're doing.  
+**A.** They are JSON files in "My Games/Skyrim/SuperStash" under "Stashes". The files are named "<Sourcefile>_<FormID>.json" (for example, the Breezehome bedroom chest is "Skyrim.esm_000F3922.json". The backups are numbered 1-9. Don't mess with the Config folder; if you screw that up you may lose all your Stash data.
 
 **Q.** How many revisions are there?  
-**A.** 10. That's a more or less arbitrary number and there's no reason there can't be more if people want them.  
+**A.** 10. That's a more or less arbitrary number and there's no reason there can't be more if people want them.
 
 **Q.** What's with the Items folder?  
 **A.** That's a feature from Familiar Faces that I wound up using here too. It stores custom items in a human-readable format, which may be used in future versions of either SkyBox or FF.  
