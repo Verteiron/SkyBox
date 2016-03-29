@@ -645,16 +645,35 @@ SInt32 FillContainerFromJson(TESObjectREFR* pContainerRef, Json::Value jContaine
 
 	if (!pContainer)
 		return result;
-		
+	
+	_MESSAGE("%s - %08x - Getting EntryList...", __FUNCTION__, pContainerRef->formID);
+
 	ExtraContainerChanges* pXContainerChanges = static_cast<ExtraContainerChanges*>(pContainerRef->extraData.GetByType(kExtraData_ContainerChanges));
 	if (!pXContainerChanges) {
 		return result;
 	}
 	EntryDataList * entryList = pXContainerChanges ? pXContainerChanges->data->objList : NULL;
 
+	_MESSAGE("%s - %08x - Starting EntryList count is %d", __FUNCTION__, pContainerRef->formID, entryList->Count());
+
 	for (auto & jEntryData : jEntryDataList) {
+		_MESSAGE("%s - %08x - Retrieving form %s", __FUNCTION__, pContainerRef->formID, jEntryData["form"].asCString());
 		TESForm * thisForm = GetJCStringForm(jEntryData["form"].asString());
+
+		_MESSAGE("%s - %08x - BEGIN Processing Form %08x (%s)", __FUNCTION__, pContainerRef->formID, thisForm ? thisForm->formID : 0, jEntryData["name"].asCString());
+
+		const char * sFormName = NULL;
+		if (thisForm) {
+			
+			TESFullName* pTFullName = DYNAMIC_CAST(thisForm, TESForm, TESFullName);
+			if (pTFullName)
+				sFormName = pTFullName->name.data;
+
+			_MESSAGE("%s - %08x - Form %08x - Name is %s", __FUNCTION__, pContainerRef->formID, thisForm->formID, sFormName ? sFormName : "<NONE>");
+		}
+
 		if (thisForm && (thisForm->formID >> 24 == 0xff)) {
+			_MESSAGE("%s - %08x - Form %08x - Temporary form, sanity checking...", __FUNCTION__, pContainerRef->formID, thisForm->formID);
 			//This is a temporary form and should be sanity-checked, since these are not synced between saves.
 			TESFullName* pFullName = DYNAMIC_CAST(thisForm, TESForm, TESFullName);
 			if (!pFullName) {
@@ -668,8 +687,10 @@ SInt32 FillContainerFromJson(TESObjectREFR* pContainerRef, Json::Value jContaine
 			}
 		}
 		if (!thisForm) {
+			_MESSAGE("%s - %08x - Form FF?????? - Temporary missing or did not match, creating a new one!", __FUNCTION__, pContainerRef->formID);
 			Json::Value jPotionData = jEntryData["potionData"];
 			if (!jPotionData.empty()) {
+				_MESSAGE("%s - Form FF?????? - Form is a Potion!", __FUNCTION__, pContainerRef->formID);
 				std::vector<EffectSetting*> effects;
 				std::vector<UInt32> durations;
 				std::vector<float> magnitudes;
@@ -687,39 +708,55 @@ SInt32 FillContainerFromJson(TESObjectREFR* pContainerRef, Json::Value jContaine
 				AlchemyItem* thisPotion = _CreateCustomPotionFromVector(effects, magnitudes, areas, durations);
 				if (thisPotion)
 					thisForm = thisPotion;
+				if (thisForm)
+					_MESSAGE("%s - %08x - Created Form %08x!", __FUNCTION__, pContainerRef->formID,thisForm->formID);
 			}
 		}
 		UInt32 count = jEntryData["count"].asInt();
+		_MESSAGE("%s - %08x - Form %08x - Count is %d", __FUNCTION__, pContainerRef->formID, thisForm->formID, count);
 		if (thisForm && count) {
 			InventoryEntryData * thisEntry = pXContainerChanges->data->FindItemEntry(thisForm);
 			if (thisEntry) {
+				_MESSAGE("%s - %08x - Form %08x - Existing count is %d, adjusting by %d", __FUNCTION__, pContainerRef->formID, thisForm->formID, pContainer->CountItem(thisForm), count - pContainer->CountItem(thisForm));
 				thisEntry->countDelta = count - pContainer->CountItem(thisForm);
 			}
 			else {
+				_MESSAGE("%s - %08x - Form %08x - No inventory entry for this form, creating a new one...", __FUNCTION__, pContainerRef->formID, thisForm->formID);
 				thisEntry = InventoryEntryData::Create(thisForm, count);
 				entryList->Push(thisEntry);
+				_MESSAGE("%s - %08x - Form %08x - Entry count is now %d", __FUNCTION__, pContainerRef->formID, thisForm->formID,entryList->Count());
 			}
 
 			Json::Value jExtendDataList = jEntryData["extendDataList"];
 			if (!jExtendDataList.empty() && jExtendDataList.type() == Json::arrayValue) {
+				_MESSAGE("%s - %08x - Form %08x - Processing extendDataList...", __FUNCTION__, pContainerRef->formID, thisForm->formID);
 				ExtendDataList * edl = thisEntry->extendDataList;
 				if (!edl) {
 					edl = ExtendDataList::Create();
 					thisEntry->extendDataList = edl;
+					_MESSAGE("%s - %08x - Form %08x - Created new EDL!", __FUNCTION__, pContainerRef->formID, thisForm->formID);
+				}
+				else {
+					_MESSAGE("%s - %08x - Form %08x - EDL already exists with %d entries.", __FUNCTION__, pContainerRef->formID, thisForm->formID, edl->Count());
 				}
 				//If anything in this plugin causes leaks or other Bad Things, it's probably this next bit.
 				for (auto & jBaseExtraData : jExtendDataList) {
 					if (IsWorthLoading(jBaseExtraData)) {
+						_MESSAGE("%s - %08x - Form %08x - Creating new BEL...", __FUNCTION__, pContainerRef->formID, thisForm->formID);
 						BaseExtraList * newBEL = CreateBaseExtraListFromJson(thisForm, jBaseExtraData);
 						if (newBEL->m_data)
 							edl->Push(newBEL);
+						_MESSAGE("%s - %08x - Form %08x - EDL count is now %d", __FUNCTION__, pContainerRef->formID, thisForm->formID,edl->Count());
 					}
 				}
 			}
+
+			_MESSAGE("%s - %08x - FINISH Processing Form %08x (%s)", __FUNCTION__, pContainerRef->formID, thisForm->formID, sFormName);
+			_MESSAGE("--------------");
 		}
 		//entryList->Dump();
 	}
-
+	_MESSAGE("%s - %08x - Ending EntryList count is %d", __FUNCTION__, pContainerRef->formID, entryList->Count());
 	return entryList->Count();
 }
 
@@ -852,10 +889,12 @@ namespace papyrusSuperStash
 
 	SInt32 FillContainerFromJSON(StaticFunctionTag*, TESObjectREFR* pContainerRef, BSFixedString filePath)
 	{
+		_MESSAGE("%s - %08x - Called with file %s", __FUNCTION__, pContainerRef->formID, filePath.data);
 		Json::Value jsonData;
 		LoadJsonFromFile(filePath.data, jsonData);
 		if (jsonData.empty())
 			return 0;
+		_MESSAGE("%s - %08x - File has valid data, filling container!", __FUNCTION__, pContainerRef->formID);
 		return FillContainerFromJson(pContainerRef, jsonData);
 	}
 
