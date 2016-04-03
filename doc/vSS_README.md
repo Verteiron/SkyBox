@@ -1,6 +1,9 @@
 #SkyBox
 Skyrim mod that allow items to be shared between different playthroughs. Any number of in-game chests can be turned into a *Stash*, which means its contents will be persistent no matter which character you are playing. This is still in development.
 
+##Updats
+* 1.0.1 - Fixed a bug that could lead to serious savegame trouble if Create Stash was cast on the same container several times in a row.
+
 ##How to use it
 After installing, you'll get a lesser power called *SkyBox: Create Stash*. Aim yourself at a Container object (anything you can put stuff in that isn't another actor) and use the Power. The container is now a *Stash*, and will glow a bit. Anything you put in the Stash will be saved and made available to your other characters. 
 
